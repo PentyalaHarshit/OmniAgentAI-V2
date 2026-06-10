@@ -1,0 +1,298 @@
+import re
+from agents.coding_agent import CodingAgent
+from agents.deployment_agent import DeploymentAgent
+from agents.healthcare_agent import HealthcareAgent
+from agents.research_agent import ResearchAgent
+from agents.resume_agent import ResumeAgent
+from agents.shopping_agent import ShoppingAgent
+from agents.travel_agent import TravelAgent
+from agents.flight_agent import FlightAgent
+from agents.hotel_agent import HotelAgent
+from agents.movie_agent import MovieAgent
+from agents.restaurant_agent import RestaurantAgent
+from agents.train_agent import TrainAgent
+from agents.bus_agent import BusAgent
+from agents.cab_agent import CabAgent
+from agents.event_agent import EventAgent
+from agents.calculator_agent import CalculatorAgent
+from agents.vacation_package_agent import VacationPackageAgent
+from agents.payment_agent import PaymentAgent
+from agents.coupon_agent import CouponAgent
+from agents.review_agent import ReviewAgent
+from agents.cancellation_agent import CancellationAgent
+from agents.notification_agent import NotificationAgent
+from agents.support_agent import SupportAgent
+from agents.general_agent import GeneralAgent
+from tools.query_corrector import QueryCorrector
+
+
+def has_any_phrase(q: str, phrases: list[str]) -> bool:
+    return any(p in q for p in phrases)
+
+def has_any_word(q: str, words: list[str]) -> bool:
+    return any(re.search(rf"\b{re.escape(w)}\b", q) for w in words)
+
+
+DEPLOYMENT_KEYWORDS = [
+    # Explicit deployment verbs + targets
+    "deploy", "deployment", "containerize", "dockerize",
+    # Docker
+    "docker", "dockerfile", "docker compose", "docker-compose",
+    # Kubernetes / orchestration
+    "kubernetes", "k8s", "kubectl", "helm", "pod", "ingress",
+    # Cloud platforms
+    "aws", "ec2", "ecs", "fargate", "elastic beanstalk",
+    "azure", "azure container",
+    "gcp", "cloud run", "google cloud",
+    "railway", "render", "fly.io", "heroku", "vercel",
+    # Web servers / process managers
+    "nginx", "gunicorn", "uvicorn",
+    # CI/CD
+    "ci/cd", "github actions", "gitlab ci", "jenkins", "circleci",
+    # Infrastructure as code
+    "terraform", "ansible", "infrastructure as code",
+    # Hosting
+    "self-host", "self host", "vps", "server setup",
+]
+
+
+class AgentRouter:
+    name = "AgentRouter"
+
+    def __init__(self):
+        self.query_corrector = QueryCorrector()
+        self.coding_agent = CodingAgent()
+        self.deployment_agent = DeploymentAgent()
+        self.healthcare_agent = HealthcareAgent()
+        self.research_agent = ResearchAgent()
+        self.resume_agent = ResumeAgent()
+        self.shopping_agent = ShoppingAgent()
+        self.travel_agent = TravelAgent()
+        self.flight_agent = FlightAgent()
+        self.calculator_agent = CalculatorAgent()
+        self.hotel_agent = HotelAgent()
+        self.movie_agent = MovieAgent()
+        self.restaurant_agent = RestaurantAgent()
+        self.train_agent = TrainAgent()
+        self.bus_agent = BusAgent()
+        self.cab_agent = CabAgent()
+        self.event_agent = EventAgent()
+        self.vacation_package_agent = VacationPackageAgent()
+        self.payment_agent = PaymentAgent()
+        self.coupon_agent = CouponAgent()
+        self.review_agent = ReviewAgent()
+        self.cancellation_agent = CancellationAgent()
+        self.notification_agent = NotificationAgent()
+        self.support_agent = SupportAgent()
+        self.general_agent = GeneralAgent()
+
+    def route(self, query: str):
+        q = query.lower()
+
+        # ── Math expressions must be caught FIRST ─────────────────────────
+        if self.is_math_query(query):
+            return "calculator", self.calculator_agent
+
+        # ── General knowledge questions ───────────────────────────────────
+        GENERAL_QUESTION_PHRASES = [
+            "who invented",
+            "who discovered",
+            "who created",
+            "who won",
+            "who defeated",
+            "who founded",
+            "who is",
+            "what is",
+            "when was",
+            "when did",
+            "where is",
+            "why is",
+            "how does",
+            "how long",
+            "capital of",
+            "population of",
+            "gdp of",
+        ]
+
+        if has_any_phrase(q, GENERAL_QUESTION_PHRASES):
+            return "general", self.general_agent
+
+        # ── Domain agents ─────────────────────────────────────────────────
+        if any(k in q for k in ["health", "hospital", "doctor", "symptom", "pain", "diabetes", "chest pain", "medical", "fever", "breathing", "blood pressure"]):
+            return "healthcare", self.healthcare_agent
+        if self.is_deployment_query(q):
+            return "deployment", self.deployment_agent
+        if any(k in q for k in ["code", "program", "c++", "cpp", "python", "java", "algorithm",
+                                "leetcode", "codeforces", "dijkstra", "compile", "debug",
+                                # DevOps / infrastructure
+                                "kubernetes", "k8s", "kubectl", "docker", "dockerfile",
+                                "deployment", "deploy", "container", "pod", "helm", "yaml",
+                                "ci/cd", "pipeline", "terraform", "ansible", "nginx",
+                                "microservice", "api endpoint", "rest api", "graphql",
+                                "fastapi", "flask", "django", "express", "spring boot",
+                                "aws", "azure", "gcp", "cloud", "serverless", "lambda",
+                                "git", "github", "gitlab", "devops", "infrastructure",
+                                "sql", "database", "mongodb", "postgres", "redis",
+                                "function", "class", "variable", "loop", "recursion",
+                                "sorting", "linked list", "binary tree", "stack", "queue",
+                                "script", "bash", "shell", "powershell"]):
+            return "coding", self.coding_agent
+        if any(k in q for k in ["research", "paper", "literature", "survey", "research gap", "methodology"]):
+            return "research", self.research_agent
+        if any(k in q for k in ["resume", "cv", "ats", "job description", "linkedin", "experience bullet"]):
+            return "resume", self.resume_agent
+
+        SHOPPING_INTENT_PHRASES = [
+            "i want to buy",
+            "buy",
+            "purchase",
+            "shopping",
+            "recommend",
+            "best",
+            "compare",
+            "price of",
+            "under $",
+            "deal",
+            "discount",
+            "add to cart",
+        ]
+
+        SHOPPING_PRODUCTS = [
+            "phone",
+            "laptop",
+            "headphones",
+            "monitor",
+            "keyboard",
+            "mouse",
+            "tablet",
+            "camera",
+            "gpu",
+        ]
+
+        if has_any_phrase(q, SHOPPING_INTENT_PHRASES) and has_any_word(q, SHOPPING_PRODUCTS):
+            return "shopping", self.shopping_agent
+
+        if any(k in q for k in ["payment", "pay", "card", "checkout", "wallet"]):
+            return "payment", self.payment_agent
+        if any(k in q for k in ["flight", "plane", "airport", "airline"]):
+            return "flight", self.flight_agent
+        if any(k in q for k in ["hotel", "room", "stay", "check-in", "checkout", "resort"]):
+            return "hotel", self.hotel_agent
+        if any(k in q for k in ["movie", "cinema", "theater", "showtime", "ticket"]):
+            return "movie", self.movie_agent
+        if any(k in q for k in ["restaurant", "dinner", "lunch", "table", "reservation", "food"]):
+            return "restaurant", self.restaurant_agent
+        if any(k in q for k in ["train", "railway", "rail"]):
+            return "train", self.train_agent
+        if any(k in q for k in ["bus", "coach"]):
+            return "bus", self.bus_agent
+        if any(k in q for k in ["cab", "taxi", "uber", "lyft", "ride"]):
+            return "cab", self.cab_agent
+        if any(k in q for k in ["event", "concert", "game", "festival", "conference"]):
+            return "event", self.event_agent
+        if any(k in q for k in ["vacation", "package", "trip package", "holiday"]):
+            return "vacation_package", self.vacation_package_agent
+        if any(k in q for k in ["travel", "trip", "itinerary", "tour", "destination"]):
+            return "travel", self.travel_agent
+        if any(k in q for k in ["coupon", "promo", "discount", "offer"]):
+            return "coupon", self.coupon_agent
+        if any(k in q for k in ["review", "rating", "feedback"]):
+            return "review", self.review_agent
+        if any(k in q for k in ["cancel", "cancellation", "reschedule", "change booking"]):
+            return "cancellation", self.cancellation_agent
+        if any(k in q for k in ["notify", "notification", "reminder", "alert"]):
+            return "notification", self.notification_agent
+        if any(k in q for k in ["customer support", "live agent", "contact support", "raise ticket", "complaint", "helpdesk"]):
+            return "support", self.support_agent
+        return "general", self.general_agent
+
+    def get_agent_by_name(self, agent_name: str):
+        for value in self.__dict__.values():
+            if hasattr(value, "name") and value.name == agent_name:
+                return value
+        return self.general_agent
+
+    def run_with_agent_name(self, agent_name: str, query: str, prefilled_fields: dict | None = None, session_id: str = "default"):
+        agent = self.get_agent_by_name(agent_name)
+        try:
+            result = agent.run(query, prefilled_fields=prefilled_fields, session_id=session_id)
+        except TypeError:
+            result = agent.run(query)
+
+        result["router"] = {
+            "root": "User",
+            "router_agent": "AgentRouter",
+            "selected_leaf_agent": agent.name,
+            "route": agent.agent_type.lower()
+        }
+        return result
+    
+    def is_deployment_query(self, q: str) -> bool:
+        """Return True if the query is about deploying/containerising an application."""
+        return any(kw in q for kw in DEPLOYMENT_KEYWORDS)
+
+    def is_math_query(self, query: str) -> bool:
+        """
+        Returns True only for genuine arithmetic expressions.
+
+        Rules:
+        1. If the query contains 3+ consecutive English letters forming a word
+           (beyond known math function names), it's NOT math — it's natural language.
+        2. Math function names (sqrt, sin, cos, tan, log, abs, round) trigger True.
+        3. Pure expressions like "43 * 23", "(5+3)/2", "2**10" trigger True.
+           The operator must be between numbers, not embedded in words like "india-pakistan".
+        """
+        import re as _re
+
+        # Strip guidance suffixes
+        q = query
+        if "[Free LLM Tree Guidance]" in q:
+            q = q.split("[Free LLM Tree Guidance]", 1)[0]
+        if "[Uploaded File Context]" in q:
+            q = q.split("[Uploaded File Context]", 1)[0]
+        q = q.strip()
+
+        # Replace display operators
+        q_clean = q.replace("×", "*").replace("÷", "/").replace("^", "**")
+
+        # Remove explicit calculation prefixes
+        q_clean = _re.sub(
+            r"^\s*(calculate|solve|compute|evaluate|what\s+is|what's)\s*",
+            "", q_clean, flags=_re.I
+        ).strip()
+
+        # Rule 1: reject immediately if there are English words
+        # (sequences of 3+ letters not matching math function names)
+        MATH_WORDS = {"sqrt", "sin", "cos", "tan", "log", "log10", "abs", "round", "pi"}
+        words_in_query = _re.findall(r"[a-zA-Z]+", q_clean)
+        non_math_words = [w.lower() for w in words_in_query if w.lower() not in MATH_WORDS]
+        if non_math_words:
+            return False   # Has natural language words → not a math expression
+
+        # Rule 2: explicit math functions
+        if any(w in q_clean.lower() for w in MATH_WORDS - {"pi"}):
+            return True
+
+        # Rule 3: pure arithmetic — digits with operators BETWEEN them
+        # Operator must be adjacent to digits/parens, not inside a word
+        # e.g. "43 * 23" ✓   "1971" alone ✗   "india-pakistan" already rejected by Rule 1
+        has_digit    = bool(_re.search(r"\d", q_clean))
+        has_operator = bool(_re.search(r"\d\s*[\+\-\*\/\%\^]\s*\d", q_clean))  # digit OP digit
+        only_math    = bool(_re.fullmatch(r"[\d\s\.\+\-\*\/\(\)\%\^]+", q_clean))
+
+        return has_digit and has_operator and only_math
+
+    def run(self, query: str, session_id: str = "default", original_query: str = ""):
+        route_name, agent = self.route(original_query or query)
+        try:
+            result = agent.run(query, session_id=session_id)
+        except TypeError:
+            result = agent.run(query)
+
+        result["router"] = {
+            "root": "User",
+            "router_agent": "AgentRouter",
+            "selected_leaf_agent": agent.name,
+            "route": route_name
+        }
+        return result

@@ -1,0 +1,3 @@
+Shopping Agent Product Evaluation Knowledge
+
+Compare products using price, specifications, reviews, warranty, return policy, brand reputation, delivery speed, and user requirements. Never recommend a product using price alone.

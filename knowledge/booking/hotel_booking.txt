@@ -1,0 +1,1 @@
+Hotel booking knowledge, room types, guest counts, check-in/check-out, pricing and amenities.

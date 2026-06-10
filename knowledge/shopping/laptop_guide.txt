@@ -1,0 +1,3 @@
+Laptop Recommendation Guide
+
+For AI programming: 32 GB RAM preferred, NVIDIA GPU preferred, 1 TB SSD preferred, strong CPU, good cooling, and long-term reliability.

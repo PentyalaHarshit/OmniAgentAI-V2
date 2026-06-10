@@ -1,0 +1,1 @@
+Research Agent Workflow: define problem, literature review, identify gaps, collect evidence, analyze, summarize findings, propose future work.

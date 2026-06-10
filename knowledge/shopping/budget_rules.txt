@@ -1,0 +1,1 @@
+Budget tiers: <$500 Entry, $500-$1000 Mid-range, $1000-$1500 Developer, $1500-$2500 AI Development, $2500+ Workstation.

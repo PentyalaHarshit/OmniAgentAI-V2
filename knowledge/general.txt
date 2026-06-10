@@ -1,0 +1,1 @@
+General agent can use local knowledge when needed. It should be cautious when facts are current or uncertain and recommend verification.

@@ -1,0 +1,829 @@
+# Advanced Algorithms Knowledge Base for OmniAgentAI Coding Agent
+
+Use this file as RAG knowledge for:
+- Codeforces
+- LeetCode
+- Competitive programming
+- Algorithm selection
+- Complexity analysis
+- ToT algorithm scoring
+
+============================================================
+1. GRAPH ALGORITHMS
+============================================================
+
+Dijkstra Algorithm
+Use when:
+- Shortest path in weighted graph
+- All edge weights are non-negative
+Data structure:
+- priority_queue / min-heap
+Complexity:
+- O((N + M) log N)
+Avoid when:
+- Negative weights exist
+
+Bellman-Ford
+Use when:
+- Graph has negative edge weights
+- Need to detect negative cycle
+Complexity:
+- O(N * M)
+Avoid when:
+- N and M are very large
+
+Floyd-Warshall
+Use when:
+- All-pairs shortest path
+- N is small, usually N <= 500
+Complexity:
+- O(N^3)
+Good for:
+- Dense graphs
+- Multi-source shortest path
+
+0-1 BFS
+Use when:
+- Edge weights are only 0 or 1
+Data structure:
+- deque
+Complexity:
+- O(N + M)
+Better than:
+- Dijkstra for 0/1 weights
+
+Multi-source BFS
+Use when:
+- Multiple starting nodes
+- Nearest source problem
+Examples:
+- Rotting oranges
+- Nearest hospital/fire station
+- Distance from all monsters/walls
+
+Topological Sort
+Use when:
+- Directed Acyclic Graph
+- Task scheduling
+- Course prerequisites
+Complexity:
+- O(N + M)
+Methods:
+- Kahn BFS indegree
+- DFS ordering
+
+Kosaraju Algorithm
+Use when:
+- Strongly connected components in directed graph
+Complexity:
+- O(N + M)
+Steps:
+1. DFS order
+2. Reverse graph
+3. DFS in reverse order
+
+Tarjan SCC
+Use when:
+- Strongly connected components
+- One-pass DFS
+Complexity:
+- O(N + M)
+More advanced than Kosaraju.
+
+Bridges in Graph
+Use when:
+- Need edges whose removal disconnects graph
+Technique:
+- DFS tin/low arrays
+Complexity:
+- O(N + M)
+
+Articulation Points
+Use when:
+- Need vertices whose removal disconnects graph
+Technique:
+- DFS tin/low arrays
+Complexity:
+- O(N + M)
+
+Minimum Spanning Tree - Kruskal
+Use when:
+- Need minimum cost to connect all nodes
+Data structure:
+- DSU / Union-Find
+Complexity:
+- O(M log M)
+
+Minimum Spanning Tree - Prim
+Use when:
+- Dense graph or adjacency list with priority queue
+Complexity:
+- O(M log N)
+
+DSU / Union Find
+Use when:
+- Dynamic connectivity
+- Kruskal MST
+- Group merging
+- Connected components
+Operations:
+- find with path compression
+- union by size/rank
+Complexity:
+- Almost O(1), inverse Ackermann
+
+============================================================
+2. TREE ALGORITHMS
+============================================================
+
+Binary Lifting LCA
+Use when:
+- Lowest Common Ancestor queries
+- Tree path queries
+Preprocessing:
+- O(N log N)
+Query:
+- O(log N)
+
+Euler Tour
+Use when:
+- Convert subtree queries into range queries
+- Tree flattening
+Works with:
+- Segment tree
+- Fenwick tree
+
+Heavy-Light Decomposition
+Use when:
+- Path queries on tree
+- Path update / path maximum / path sum
+Complexity:
+- O(log^2 N) per query
+Requires:
+- Segment tree
+
+Centroid Decomposition
+Use when:
+- Advanced tree distance queries
+- Dynamic nearest red node
+Complexity:
+- O(N log N)
+Common in:
+- Codeforces tree problems
+
+Tree DP
+Use when:
+- Optimize over tree
+Examples:
+- Maximum independent set
+- Diameter
+- Rerooting DP
+
+Rerooting DP
+Use when:
+- Need answer for every node as root
+Complexity:
+- O(N)
+Examples:
+- Sum of distances from every node
+- Maximum subtree contribution
+
+============================================================
+3. DYNAMIC PROGRAMMING
+============================================================
+
+1D DP
+Use when:
+- State depends on previous states
+Example:
+- Fibonacci
+- Climbing stairs
+- House robber
+
+2D DP
+Use when:
+- Two parameters define state
+Examples:
+- LCS
+- Edit distance
+- Grid paths
+
+Knapsack DP
+0/1 Knapsack:
+- Choose or skip item
+- dp[w] = max value
+Complexity:
+- O(N * W)
+
+Unbounded Knapsack:
+- Can choose item multiple times
+
+Subset Sum
+Use when:
+- Need determine if sum is possible
+Optimization:
+- bitset DP
+
+LIS - Longest Increasing Subsequence
+O(N^2):
+- simple DP
+O(N log N):
+- patience sorting + lower_bound
+
+Digit DP
+Use when:
+- Count numbers in range [L, R]
+- Constraints on digits
+State:
+- position
+- tight
+- started
+- sum/mod/count
+
+Bitmask DP
+Use when:
+- N <= 20 usually
+- State is subset
+Examples:
+- Traveling Salesman
+- Assignment problem
+Complexity:
+- O(N * 2^N)
+
+DP on Trees
+Use when:
+- Tree choices depend on children
+Examples:
+- Vertex cover
+- Independent set
+- Max matching on tree
+
+DP with Prefix Optimization
+Use when:
+- Transition has range sum/min/max
+Optimization:
+- Prefix sums
+- Sliding window
+- Monotonic queue
+
+Divide and Conquer DP Optimization
+Use when:
+- dp[i][j] = min over k of previous state + cost
+- Optimal k is monotonic
+Complexity:
+- O(K * N log N) or O(K * N)
+
+Convex Hull Trick
+Use when:
+- DP transition has lines
+Form:
+- dp[i] = min(dp[j] + m[j] * x[i] + b[j])
+Use:
+- Li Chao Tree
+- Dynamic CHT
+
+Knuth Optimization
+Use when:
+- Interval DP
+- Quadrangle inequality holds
+Complexity:
+- O(N^3) to O(N^2)
+
+============================================================
+4. STRING ALGORITHMS
+============================================================
+
+KMP Algorithm
+Use when:
+- Pattern matching
+- Find pattern in text
+Complexity:
+- O(N + M)
+Core:
+- prefix function / LPS array
+
+Z Algorithm
+Use when:
+- Pattern matching
+- String similarity from each index
+Complexity:
+- O(N)
+
+Rabin-Karp
+Use when:
+- Rolling hash
+- Multiple substring comparisons
+Complexity:
+- Average O(N)
+Risk:
+- Hash collision
+
+Trie
+Use when:
+- Prefix search
+- Dictionary words
+- XOR max/min query
+Complexity:
+- O(length)
+
+Aho-Corasick
+Use when:
+- Multiple pattern matching
+- Many keywords in one text
+Complexity:
+- O(total length + text length)
+
+Suffix Array
+Use when:
+- Sort all suffixes
+- Substring queries
+- Count distinct substrings
+Complexity:
+- O(N log N)
+
+Suffix Automaton
+Use when:
+- Count distinct substrings
+- Longest common substring
+Advanced string structure
+Complexity:
+- O(N)
+
+Manacher Algorithm
+Use when:
+- Longest palindromic substring
+Complexity:
+- O(N)
+
+============================================================
+5. RANGE QUERY DATA STRUCTURES
+============================================================
+
+Prefix Sum
+Use when:
+- Static range sum
+Complexity:
+- Build O(N), query O(1)
+
+Difference Array
+Use when:
+- Many range updates
+- Final array needed
+Complexity:
+- O(N + Q)
+
+Fenwick Tree / BIT
+Use when:
+- Point update + prefix/range sum
+Complexity:
+- O(log N)
+Also supports:
+- inversion count
+- order statistics with binary lifting
+
+Segment Tree
+Use when:
+- Range query + point/range update
+Complexity:
+- O(log N)
+Can store:
+- sum
+- min
+- max
+- gcd
+- custom node
+
+Lazy Segment Tree
+Use when:
+- Range update + range query
+Examples:
+- range add
+- range assign
+- range min/max/sum
+
+Sparse Table
+Use when:
+- Static range idempotent query
+Examples:
+- min, max, gcd
+Complexity:
+- Build O(N log N)
+- Query O(1)
+
+Mo's Algorithm
+Use when:
+- Offline range queries
+- Add/remove elements efficiently
+Complexity:
+- O((N + Q) sqrt N)
+
+Sqrt Decomposition
+Use when:
+- Range query/update with medium constraints
+Complexity:
+- O(sqrt N)
+
+============================================================
+6. MATH AND NUMBER THEORY
+============================================================
+
+GCD / Euclidean Algorithm
+Use when:
+- Greatest common divisor
+Complexity:
+- O(log min(a,b))
+
+Extended Euclidean Algorithm
+Use when:
+- Modular inverse when mod is not prime
+- Solve ax + by = gcd(a,b)
+
+Modular Exponentiation
+Use when:
+- Compute a^b mod m
+Complexity:
+- O(log b)
+
+Sieve of Eratosthenes
+Use when:
+- Generate primes up to N
+Complexity:
+- O(N log log N)
+
+Smallest Prime Factor Sieve
+Use when:
+- Fast factorization for many numbers
+Complexity:
+- Preprocess O(N log log N)
+- Factorize O(log N)
+
+Euler Totient
+Use when:
+- Count numbers <= n coprime to n
+
+Combinatorics nCr
+Use when:
+- Counting combinations modulo prime
+Precompute:
+- factorial
+- inverse factorial
+Complexity:
+- O(N) preprocess, O(1) query
+
+Chinese Remainder Theorem
+Use when:
+- Solve simultaneous modular equations
+
+Matrix Exponentiation
+Use when:
+- Linear recurrence
+- Fibonacci large N
+Complexity:
+- O(k^3 log N)
+
+Fast Fourier Transform
+Use when:
+- Polynomial multiplication
+- Convolution
+Complexity:
+- O(N log N)
+
+============================================================
+7. GREEDY ALGORITHMS
+============================================================
+
+Sorting Greedy
+Use when:
+- Choose smallest/largest first
+- Interval scheduling
+- Minimum platforms
+- Activity selection
+
+Priority Queue Greedy
+Use when:
+- Always take best current option
+Examples:
+- Huffman coding
+- Minimum cost merge
+- Scheduling
+
+Interval Greedy
+Use when:
+- Select max non-overlapping intervals
+Sort by:
+- ending time
+
+Exchange Argument
+Use when:
+- Need prove greedy correctness
+Idea:
+- Show any optimal solution can be transformed to greedy solution
+
+============================================================
+8. BINARY SEARCH
+============================================================
+
+Binary Search on Sorted Array
+Use when:
+- Find target/lower_bound/upper_bound
+
+Binary Search on Answer
+Use when:
+- Answer is monotonic
+Pattern:
+- can(x) true/false
+Examples:
+- Minimum maximum load
+- Allocate books
+- Aggressive cows
+- Minimum days
+
+Floating Binary Search
+Use when:
+- Real number answer
+Stop after fixed iterations
+
+============================================================
+9. BACKTRACKING AND SEARCH
+============================================================
+
+Backtracking
+Use when:
+- Generate all possibilities
+Examples:
+- permutations
+- combinations
+- N queens
+- sudoku
+
+Branch and Bound
+Use when:
+- Search space can be pruned using bounds
+
+Meet in the Middle
+Use when:
+- N around 40
+Split into two halves
+Complexity:
+- O(2^(N/2))
+
+============================================================
+10. FLOW ALGORITHMS
+============================================================
+
+Max Flow - Dinic
+Use when:
+- Maximum flow in graph
+Complexity:
+- O(V^2 E), faster in practice
+Applications:
+- Bipartite matching
+- Min cut
+- Assignment
+
+Edmonds-Karp
+Use when:
+- Simpler max flow
+Complexity:
+- O(VE^2)
+
+Min Cost Max Flow
+Use when:
+- Need maximum flow with minimum cost
+Applications:
+- Assignment with costs
+- Transportation
+
+Bipartite Matching
+Use when:
+- Match left and right sets
+Algorithms:
+- DFS augmenting path
+- Hopcroft-Karp
+
+Hopcroft-Karp
+Use when:
+- Large bipartite matching
+Complexity:
+- O(E sqrt(V))
+
+============================================================
+11. GEOMETRY
+============================================================
+
+Orientation / Cross Product
+Use when:
+- Clockwise / counterclockwise
+- Segment intersection
+
+Convex Hull
+Algorithms:
+- Graham Scan
+- Monotonic Chain
+Complexity:
+- O(N log N)
+
+Line Sweep
+Use when:
+- Events sorted by x/time
+Examples:
+- overlapping intervals
+- closest pair
+- rectangle union
+
+Closest Pair of Points
+Use when:
+- Minimum distance among points
+Complexity:
+- O(N log N)
+
+============================================================
+12. ADVANCED COMPETITIVE PROGRAMMING PATTERNS
+============================================================
+
+Two Pointers
+Use when:
+- Sorted array
+- Sliding condition
+Complexity:
+- O(N)
+
+Sliding Window
+Use when:
+- Contiguous subarray/string
+Examples:
+- longest substring
+- max sum window
+
+Monotonic Stack
+Use when:
+- Next greater/smaller element
+- Histogram rectangle
+Complexity:
+- O(N)
+
+Monotonic Queue
+Use when:
+- Sliding window min/max
+Complexity:
+- O(N)
+
+Coordinate Compression
+Use when:
+- Large values but relative order matters
+Examples:
+- Fenwick tree with large coordinates
+
+Offline Queries
+Use when:
+- Queries can be sorted/reordered
+Examples:
+- Mo's algorithm
+- DSU rollback
+- Fenwick sorting by value
+
+DSU Rollback
+Use when:
+- Dynamic connectivity offline
+- Undo union operations
+
+Persistent Segment Tree
+Use when:
+- Need previous versions
+Examples:
+- kth smallest in range
+- historical queries
+
+Li Chao Tree
+Use when:
+- Dynamic lines and min/max query
+Complexity:
+- O(log C)
+
+============================================================
+13. HOW CODING AGENT SHOULD SELECT ALGORITHM
+============================================================
+
+If problem mentions:
+- shortest path + weighted + non-negative → Dijkstra
+- shortest path + negative weights → Bellman-Ford
+- shortest path + unweighted → BFS
+- edge weight 0/1 → 0-1 BFS
+- all pairs shortest path + small N → Floyd-Warshall
+- tree path query → LCA or HLD
+- subtree query → Euler Tour + Fenwick/Segment Tree
+- dynamic connectivity → DSU
+- minimum connection cost → MST
+- range query/update → Segment Tree/Fenwick
+- static RMQ → Sparse Table
+- pattern matching → KMP/Z
+- many patterns → Aho-Corasick
+- palindromes → Manacher
+- subset with N <= 20 → Bitmask DP
+- count numbers in range → Digit DP
+- monotonic answer → Binary Search on Answer
+- intervals → Greedy/Sort/Line Sweep
+- bipartite matching → Hopcroft-Karp
+- max flow/min cut → Dinic
+- polynomial multiplication → FFT
+- N around 40 subset → Meet in the Middle
+
+============================================================
+14. SELF-CORRECTION RULES FOR CODING AGENT
+============================================================
+
+If TLE:
+- Check complexity
+- Replace O(N^2) with O(N log N)
+- Use prefix sums / Fenwick / segment tree
+- Use binary search
+- Avoid nested loops
+- Use faster I/O in C++
+
+If MLE:
+- Avoid huge 2D arrays
+- Use rolling DP
+- Use sparse representation
+- Use adjacency list instead of matrix
+- Use coordinate compression
+
+If Wrong Answer:
+- Check edge cases
+- Check indexing 0-based vs 1-based
+- Check overflow int vs long long
+- Check modulo
+- Check disconnected graph
+- Check empty input
+- Check sorting condition
+
+If Runtime Error:
+- Check array bounds
+- Check division by zero
+- Check recursion depth
+- Check stack overflow
+- Check uninitialized variables
+
+============================================================
+15. COMPLEXITY GUIDE
+============================================================
+
+N <= 20:
+- Bitmask DP / backtracking possible
+
+N <= 500:
+- O(N^3) may pass
+
+N <= 5000:
+- O(N^2) may pass
+
+N <= 2e5:
+- O(N log N) needed
+
+N <= 1e6:
+- O(N) or O(N log N)
+
+T up to 1e4:
+- Total sum constraints matter
+
+============================================================
+16. CODEFORCES STRATEGY
+============================================================
+
+For Codeforces:
+1. Read constraints first.
+2. Identify input size.
+3. Determine required complexity.
+4. Look for monotonicity, graph structure, tree, DP state.
+5. Try greedy only if proof exists.
+6. Always test:
+   - minimum input
+   - maximum input
+   - all equal
+   - sorted ascending
+   - sorted descending
+   - disconnected graph
+   - single node
+   - duplicate values
+7. Use long long for sums/products.
+8. Avoid recursion if tree depth can be 2e5 unless using iterative DFS or increasing stack.
+
+============================================================
+17. COMMON C++ TEMPLATES TO RETRIEVE
+============================================================
+
+Use these template names:
+- dijkstra_cpp
+- bfs_cpp
+- dfs_cpp
+- dsu_cpp
+- segment_tree_cpp
+- lazy_segment_tree_cpp
+- fenwick_cpp
+- lca_binary_lifting_cpp
+- topological_sort_cpp
+- kmp_cpp
+- z_algorithm_cpp
+- trie_cpp
+- dinic_cpp
+- bitmask_dp_cpp
+- digit_dp_cpp

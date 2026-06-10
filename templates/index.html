@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OmniAgentAI v2 Chat</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- ── Sidebar ────────────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">O</div>
+      <div>
+        <h2>OmniAgentAI v2</h2>
+        <p>Agentic AI Chat</p>
+      </div>
+    </div>
+
+    <button class="new-chat" onclick="resetChat()">+ New Chat</button>
+
+    <div class="side-section">
+      <h3>FILES</h3>
+      <label class="upload-card">
+        <input type="file" id="fileInput" accept=".txt,.pdf,.docx" onchange="uploadFile()">
+        <span>📎 Upload file</span>
+        <small>TXT, PDF, DOCX</small>
+      </label>
+      <select id="fileSelect" onchange="updateAttachedPill()">
+        <option value="">No file selected</option>
+      </select>
+      <p id="uploadStatus"></p>
+    </div>
+
+    <div class="side-section">
+      <h3>AGENTS</h3>
+      <ul class="agent-list">
+        <li>Healthcare</li>
+        <li>Travel / Hotel / Movie</li>
+        <li>Coding</li>
+        <li>Shopping / Payment</li>
+        <li>Research / Resume</li>
+        <li>General · Web RAG</li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- ── Main ───────────────────────────────────────────────────────── -->
+  <main class="chat-main">
+
+    <header class="chat-header">
+      <h1>OmniAgentAI</h1>
+      <p>Talk naturally. Upload files. Agents ask follow-up questions like a human assistant.</p>
+    </header>
+
+    <div id="chatMessages" class="chat-messages">
+      <div class="message assistant">
+        <div class="avatar">AI</div>
+        <div class="bubble">
+          Hi! I can help with <b>travel, healthcare, hotels, movies, coding, shopping, research, resume</b>, and general knowledge questions.
+          <br><br>
+          Try asking:
+          <ul>
+            <li><b>What is the capital of Japan?</b></li>
+            <li><b>How long did the Chola dynasty rule?</b></li>
+            <li><b>I need a hotel in Paris</b></li>
+            <li><b>Who invented the telephone?</b></li>
+            <li><b>43 * 23</b> &nbsp;(calculator)</li>
+          </ul>
+          <br>Or upload a file and ask me anything about it.
+        </div>
+      </div>
+    </div>
+
+    <!-- Details panel -->
+    <section id="detailsPanel" class="details-panel hidden">
+      <div class="meta">
+        <span id="best_model"></span>
+        <span id="best_score"></span>
+        <span id="llm_latency"></span>
+        <span id="route"></span>
+        <span id="agent"></span>
+        <span id="file_used"></span>
+      </div>
+      <details id="scoresDetails">
+        <summary>Show LLM tree scores</summary>
+        <div id="scores"></div>
+      </details>
+      <details id="thoughtsDetails">
+        <summary>Show agent thoughts</summary>
+        <ol id="thoughts"></ol>
+      </details>
+    </section>
+
+    <!-- Composer -->
+    <div class="composer-wrap">
+      <div id="attachedFilePill" class="attached-file hidden"></div>
+      <div class="composer">
+        <button class="icon-btn" onclick="document.getElementById('fileInput').click()">📎</button>
+        <textarea id="query"
+                  placeholder="Message OmniAgentAI..."
+                  rows="1"
+                  onkeydown="handleKey(event)"
+                  oninput="autoResize(this)"></textarea>
+        <button class="send-btn" onclick="askAgent()">➤</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const SESSION_ID = "default";
+
+function autoResize(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 160) + "px";
+}
+
+function renderMarkdown(text) {
+  // ── Extract and strip checkout form block before markdown rendering ──
+  const checkoutMatch = text.match(/---CHECKOUT_FORM---([\s\S]*?)---END_CHECKOUT_FORM---/);
+  let checkoutHtml = "";
+  if (checkoutMatch) {
+    text = text.replace(/---CHECKOUT_FORM---[\s\S]*?---END_CHECKOUT_FORM---/, "");
+    const block = checkoutMatch[1];
+    const get = (key) => { const m = block.match(new RegExp(key + ":(.+)")); return m ? m[1].trim() : ""; };
+    checkoutHtml = buildCheckoutForm(get("PRODUCT_NAME"), get("PRODUCT_PRICE"), get("AMAZON_LINK"), get("ESTIMATED_DELIVERY"));
+  }
+
+  let s = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  s = s.replace(/```([\s\S]*?)```/g, "<pre><code>$1</code></pre>");
+  s = s.replace(/`([^`]+)`/g, "<code style='background:#1e2236;padding:2px 5px;border-radius:4px'>$1</code>");
+  s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  s = s.replace(/(^|\n)[•\-] (.+)/g, "$1<li>$2</li>");
+  s = s.replace(/(<li>.*<\/li>)/gs, "<ul>$1</ul>");
+  s = s.replace(/\n/g, "<br>");
+  return s + checkoutHtml;
+}
+
+function buildCheckoutForm(productName, productPrice, amazonLink, estimatedDelivery) {
+  return `
+  <div class="checkout-card" id="checkoutCard">
+    <div class="checkout-header">
+      🛒 <strong>Complete Your Order</strong>
+      <span class="checkout-badge">Powered by Amazon Delivery</span>
+    </div>
+
+    <div class="checkout-product-row">
+      <span>📦 <strong>${productName}</strong></span>
+      <span class="checkout-price">${productPrice}</span>
+    </div>
+    <div class="checkout-delivery-note">🚚 Estimated delivery: <strong>${estimatedDelivery}</strong></div>
+
+    <div class="checkout-section-title">📍 Delivery Address</div>
+    <div class="checkout-grid">
+      <input class="checkout-input" id="co_street"  placeholder="Street address" />
+      <input class="checkout-input" id="co_city"    placeholder="City" />
+      <input class="checkout-input" id="co_state"   placeholder="State / Province" />
+      <input class="checkout-input" id="co_zip"     placeholder="ZIP / Postal code" />
+      <input class="checkout-input co-full" id="co_country" placeholder="Country" value="Australia" />
+    </div>
+
+    <div class="checkout-section-title">💳 Card Details</div>
+    <div class="checkout-grid">
+      <input class="checkout-input co-full" id="co_card_name"   placeholder="Name on card" />
+      <input class="checkout-input co-full" id="co_card_number" placeholder="Card number (demo only)" maxlength="19"
+             oninput="formatCardNumber(this)" />
+      <input class="checkout-input" id="co_card_expiry" placeholder="MM / YY" maxlength="7"
+             oninput="formatExpiry(this)" />
+      <input class="checkout-input" id="co_card_cvv"    placeholder="CVV" maxlength="4" type="password" />
+    </div>
+
+    <div class="checkout-demo-note">
+      🔒 Demo mode — no real payment is processed. Card details are not stored or transmitted.
+    </div>
+
+    <div class="checkout-actions">
+      <button class="checkout-btn-amazon" onclick="confirmOrder('${amazonLink}', '${productName}', '${productPrice}')">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" alt="Amazon" height="18" style="vertical-align:middle;margin-right:6px">
+        Confirm &amp; Place Order via Amazon
+      </button>
+      <button class="checkout-btn-cancel" onclick="cancelOrder()">Cancel</button>
+    </div>
+    <div id="checkoutResult" class="checkout-result hidden"></div>
+  </div>`;
+}
+
+function formatCardNumber(el) {
+  let v = el.value.replace(/\D/g, "").substring(0, 16);
+  el.value = v.replace(/(.{4})/g, "$1 ").trim();
+}
+
+function formatExpiry(el) {
+  let v = el.value.replace(/\D/g, "").substring(0, 4);
+  if (v.length >= 3) v = v.substring(0, 2) + " / " + v.substring(2);
+  el.value = v;
+}
+
+function confirmOrder(amazonLink, productName, productPrice) {
+  const street  = document.getElementById("co_street")?.value.trim();
+  const city    = document.getElementById("co_city")?.value.trim();
+  const state   = document.getElementById("co_state")?.value.trim();
+  const zip     = document.getElementById("co_zip")?.value.trim();
+  const country = document.getElementById("co_country")?.value.trim();
+  const cardNum = document.getElementById("co_card_number")?.value.trim();
+  const expiry  = document.getElementById("co_card_expiry")?.value.trim();
+  const cvv     = document.getElementById("co_card_cvv")?.value.trim();
+  const name    = document.getElementById("co_card_name")?.value.trim();
+
+  if (!street || !city || !zip) {
+    showCheckoutResult("⚠️ Please fill in your delivery address (street, city, ZIP).", "error"); return;
+  }
+  if (!name || cardNum.replace(/\s/g,"").length < 13 || !expiry || cvv.length < 3) {
+    showCheckoutResult("⚠️ Please fill in all card details correctly.", "error"); return;
+  }
+
+  const last4 = cardNum.replace(/\s/g,"").slice(-4);
+  showCheckoutResult(
+    `✅ <strong>Order confirmed! (Demo)</strong><br>
+     📦 <strong>${productName}</strong> — ${productPrice}<br>
+     📍 Delivering to: ${street}, ${city}, ${state} ${zip}, ${country}<br>
+     💳 Card ending in <strong>${last4}</strong><br>
+     🚚 Estimated delivery: <strong>3–5 business days</strong><br><br>
+     <a href="${amazonLink}" target="_blank" rel="noopener noreferrer"
+        style="color:#f90;font-weight:bold">
+       🔗 View on Amazon →
+     </a><br>
+     <small style="color:#aaa">Demo only — no real order was placed or charged.</small>`,
+    "success"
+  );
+}
+
+function cancelOrder() {
+  showCheckoutResult("Order cancelled. You can start a new search anytime.", "info");
+}
+
+function showCheckoutResult(html, type) {
+  const el = document.getElementById("checkoutResult");
+  if (!el) return;
+  el.innerHTML = html;
+  el.className = "checkout-result checkout-result-" + type;
+}
+
+function escapeHtml(t) {
+  return (t || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function addMessage(role, content) {
+  const container = document.getElementById("chatMessages");
+  const msg = document.createElement("div");
+  msg.className = "message " + role;
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = role === "user" ? "You" : "AI";
+
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.innerHTML = renderMarkdown(content);
+
+  msg.appendChild(avatar);
+  msg.appendChild(bubble);
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+}
+
+function showTyping() {
+  const container = document.getElementById("chatMessages");
+  const msg = document.createElement("div");
+  msg.className = "message assistant";
+  msg.id = "typing-bubble";
+  msg.innerHTML = `<div class="avatar">AI</div>
+    <div class="bubble typing">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    </div>`;
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+}
+
+function removeTyping() {
+  document.getElementById("typing-bubble")?.remove();
+}
+
+function handleKey(e) {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); askAgent(); }
+}
+
+async function refreshFiles() {
+  try {
+    const res = await fetch("/files");
+    const data = await res.json();
+    const sel = document.getElementById("fileSelect");
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">No file selected</option>';
+    (data.files || []).forEach(f => {
+      const opt = document.createElement("option");
+      opt.value = f.file_id;
+      opt.textContent = f.filename;
+      sel.appendChild(opt);
+    });
+    if (prev) sel.value = prev;
+    updateAttachedPill();
+  } catch (_) {}
+}
+
+function updateAttachedPill() {
+  const sel  = document.getElementById("fileSelect");
+  const pill = document.getElementById("attachedFilePill");
+  if (sel.value) {
+    pill.classList.remove("hidden");
+    pill.textContent = "📎 " + sel.options[sel.selectedIndex].textContent;
+  } else {
+    pill.classList.add("hidden");
+  }
+}
+
+async function uploadFile() {
+  const input = document.getElementById("fileInput");
+  if (!input.files.length) return;
+  const form = new FormData();
+  form.append("file", input.files[0]);
+  document.getElementById("uploadStatus").textContent = "Uploading...";
+  try {
+    const res  = await fetch("/upload", { method: "POST", body: form });
+    const data = await res.json();
+    document.getElementById("uploadStatus").textContent = "✓ " + data.filename;
+    await refreshFiles();
+    document.getElementById("fileSelect").value = data.file_id;
+    updateAttachedPill();
+    addMessage("assistant", `File uploaded: **${data.filename}**\nAsk me anything about this file.`);
+  } catch (e) {
+    document.getElementById("uploadStatus").textContent = "Upload failed.";
+  }
+}
+
+async function askAgent() {
+  const textarea = document.getElementById("query");
+  const query    = textarea.value.trim();
+  const file_id  = document.getElementById("fileSelect").value;
+  if (!query) return;
+
+  addMessage("user", query);
+  textarea.value = "";
+  textarea.style.height = "auto";
+  showTyping();
+
+  try {
+    const res  = await fetch("/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, file_id, session_id: SESSION_ID })
+    });
+    const data = await res.json();
+    removeTyping();
+    addMessage("assistant", data.final_answer || "Sorry, I couldn't find an answer.");
+    renderDetails(data);
+  } catch (e) {
+    removeTyping();
+    addMessage("assistant", "⚠️ Network error. Please check the server.");
+  }
+}
+
+function renderDetails(data) {
+  document.getElementById("detailsPanel").classList.remove("hidden");
+  document.getElementById("best_model").textContent  = "LLM: "       + (data.llm_tree?.best_model ?? "");
+  document.getElementById("best_score").textContent  = "Score: "     + (data.llm_tree?.best_score ?? "");
+  document.getElementById("llm_latency").textContent = "LLM time: "  + (data.llm_tree?.total_latency_seconds ?? "n/a") + "s";
+  document.getElementById("route").textContent       = "Route: "     + (data.agent_result?.router?.route ?? "");
+  document.getElementById("agent").textContent       = "Agent: "     + (data.agent_result?.agent ?? "");
+  document.getElementById("file_used").textContent   = "File used: " + data.file_context_used;
+
+  const scores = document.getElementById("scores");
+  scores.innerHTML = "";
+  (data.llm_tree?.scores || []).forEach(s => {
+    const div = document.createElement("div");
+    div.className = "score";
+    div.innerHTML = `<b>${s.model}</b> <span>${s.backend || ""} ${s.ollama_model || s.model_id || ""}</span>
+      <p>Score: ${s.score?.final_score ?? ""} | Time: ${s.latency_seconds ?? "n/a"}s</p>
+      <pre>${escapeHtml(s.output || "")}</pre>`;
+    scores.appendChild(div);
+  });
+  document.getElementById("scoresDetails").open = false;
+
+  const thoughts = document.getElementById("thoughts");
+  thoughts.innerHTML = "";
+  (data.agent_result?.thoughts || []).forEach(t => {
+    const li = document.createElement("li");
+    li.textContent = t;
+    thoughts.appendChild(li);
+  });
+  document.getElementById("thoughtsDetails").open = false;
+}
+
+async function resetChat() {
+  await fetch("/reset", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: SESSION_ID })
+  });
+  document.getElementById("chatMessages").innerHTML = `
+    <div class="message assistant">
+      <div class="avatar">AI</div>
+      <div class="bubble">New chat started. How can I help?</div>
+    </div>`;
+  document.getElementById("detailsPanel").classList.add("hidden");
+}
+
+refreshFiles();
+</script>
+</body>
+</html>

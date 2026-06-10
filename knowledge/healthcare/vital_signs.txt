@@ -1,0 +1,1 @@
+Heart rate, oxygen saturation, blood pressure and temperature ranges.

@@ -1,0 +1,4 @@
+Travel: destination, dates, travelers.
+Hotel: city, check-in, check-out, budget.
+Flight: departure, destination, date, passengers.
+Movie: movie, city, tickets.

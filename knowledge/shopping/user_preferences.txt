@@ -1,0 +1,1 @@
+Students prioritize price and battery. Developers prioritize CPU and RAM. AI Engineers prioritize GPU, RAM, and storage.

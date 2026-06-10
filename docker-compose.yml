@@ -1,0 +1,14 @@
+services:
+  omniagentai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./knowledge:/app/knowledge
+      - ./uploads:/app/uploads
+    restart: unless-stopped

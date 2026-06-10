@@ -1,0 +1,1 @@
+Resume Agent workflow: parse resume, parse job description, match skills, rewrite bullets, ATS optimization.

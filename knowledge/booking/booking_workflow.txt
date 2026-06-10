@@ -1,0 +1,13 @@
+Booking Agent Workflow
+
+1. Identify booking type.
+2. Ask missing details.
+3. Retrieve booking knowledge using RAG.
+4. Check availability.
+5. Estimate price.
+6. Explain cancellation policy.
+7. Explain refund policy.
+8. Prepare booking summary.
+9. Ask for user confirmation.
+
+Never confirm a booking automatically.
