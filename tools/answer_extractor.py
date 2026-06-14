@@ -126,6 +126,10 @@ class AnswerExtractor:
         if self._starts_with(q, ("what is", "what are", "what was", "define", "explain")):
             return self._definition(context)
 
+        # ── Which / ranking / superlative ─────────────────────────────────
+        if self._starts_with(q, ("which ", "which country", "which nation")):
+            return self._ranking(context)
+
         return _compress(context)
 
     # ── Question type detectors ──────────────────────────────────────────

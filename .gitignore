@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+.pytest_cache/
+.coverage
+htmlcov/
+
+knowledge/general_facts.sqlite
+knowledge/general_facts.sqlite-shm
+knowledge/general_facts.sqlite-wal
+knowledge/million_general_facts.jsonl
+
+uploads/chat_memory.json
+uploads/conversation_state.json
+uploads/index.json
+uploads/tmp/

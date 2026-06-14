@@ -76,6 +76,33 @@ def test_general_agent_memory_resolution():
     assert "GDP of Paris" in result2["answer"]
 
 
+def test_general_agent_explicit_country_question_is_not_followup():
+    from tools.chat_memory import ChatMemory
+    memory = ChatMemory()
+    session_id = "test_explicit_country_question"
+    memory.clear(session_id)
+    memory.add(session_id, "user", "Tell me about India")
+    memory.add(session_id, "assistant", "India is a country in South Asia.")
+
+    agent = GeneralAgent()
+    assert not agent.is_followup("what is the capital of india?")
+
+    result = agent.run("What is the capital of India?", session_id=session_id)
+    assert "New Delhi" in result["answer"]
+    assert "capital punishment" not in result["answer"].lower()
+    assert result["extra"].get("source_stage") == "country_info_tool"
+
+
+def test_general_agent_answers_who_invented_computer_from_verified_fact():
+    agent = GeneralAgent()
+    result = agent.run("who invented computer?")
+
+    assert "Charles Babbage" in result["answer"]
+    assert "Analytical Engine" in result["answer"]
+    assert "history of computer science" not in result["answer"].lower()
+    assert result["extra"].get("source_stage") == "built_in_facts"
+
+
 def test_answer_compression():
     from agents.general_agent import AnswerExtractionAgent
     extractor = AnswerExtractionAgent()

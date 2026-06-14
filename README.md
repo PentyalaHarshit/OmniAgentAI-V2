@@ -17,6 +17,26 @@ This version fixes the upload experience and makes the UI work like a ChatGPT-st
 - Reset chat state button
 - RAG still works with uploaded TXT/PDF/DOCX files
 
+## Real APIs
+
+OmniAgentAI now has a live API layer for current-data questions:
+
+- Hotel API: Google Hotels via SerpApi (`HOTEL_PROVIDER=serpapi`, `SERPAPI_API_KEY=...`)
+- Weather API: Open-Meteo geocoding + forecast, no key required
+- News API: Google News RSS, no key required
+- Sports API: TheSportsDB public API, no key required
+- Search API: SerpApi Google Search when `SERPAPI_API_KEY` is set, DuckDuckGo Instant Answer fallback otherwise
+
+Example `.env`:
+
+```env
+HOTEL_PROVIDER=serpapi
+SERPAPI_API_KEY=your_serpapi_key
+NEWSAPI_KEY=optional_future_newsapi_key
+```
+
+Safety remains unchanged: real APIs can retrieve options and live data, but OmniAgentAI must not buy, pay, book, cancel, or diagnose without explicit user confirmation.
+
 ## Run
 
 ```bash

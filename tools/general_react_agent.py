@@ -151,9 +151,42 @@ class GeneralReActAgent:
                 f"Score: {sc} {'✓' if sc >= _MIN_SCORE else '✗'}"
             )
         if rank_lines:
-            thoughts.append("Action: Similarity rank.\n" + "\n".join(rank_lines))
+            thoughts.append("Action: Similarity rank search-result snippets.\n" + "\n".join(rank_lines))
 
-        usable = [d for d in top if d.get("similarity_score", 0) >= _MIN_SCORE]
+        chunk_candidates = ranked or docs
+        page_limit = min(len(chunk_candidates), self.searcher.max_pages_to_fetch)
+        thoughts.append(
+            f"Action: Open top {page_limit} result links, extract readable text, "
+            "and split pages into chunks."
+        )
+        chunks = self.searcher.enrich_with_page_chunks(chunk_candidates)
+        fetched_pages = {
+            c.get("url", "")
+            for c in chunks
+            if c.get("url") and c.get("page_chars", 0) > 0
+        }
+        snippet_fallbacks = sum(1 for c in chunks if c.get("page_chars", 0) == 0)
+        thoughts.append(
+            f"Observation: Built {len(chunks)} chunks from {len(fetched_pages)} fetched pages "
+            f"and {snippet_fallbacks} snippet fallbacks."
+        )
+
+        chunk_ranked = self.ranker.rank(query, chunks) if chunks else []
+        chunk_top = chunk_ranked[: self.TOP_K]
+        chunk_rank_lines = []
+        for i, d in enumerate(chunk_top):
+            sc = d.get("similarity_score", 0.0)
+            chunk_rank_lines.append(
+                f"  Chunk {i+1}: \"{d.get('title','?')[:60]}\" "
+                f"#{d.get('chunk_index', 1)} | Score: {sc} "
+                f"{'âœ“' if sc >= _MIN_SCORE else 'âœ—'}"
+            )
+        if chunk_rank_lines:
+            thoughts.append("Action: Similarity rank extracted chunks.\n" + "\n".join(chunk_rank_lines))
+
+        usable = [d for d in chunk_top if d.get("similarity_score", 0) >= _MIN_SCORE]
+        if not usable:
+            usable = [d for d in top if d.get("similarity_score", 0) >= _MIN_SCORE]
 
         # ── Action: Wikipedia direct fetch for duration / history ─────────
         # If DuckDuckGo gave us weak results, go straight to Wikipedia.
@@ -206,7 +239,7 @@ class GeneralReActAgent:
         )
 
         # ── Action: extract answer ─────────────────────────────────────────
-        thoughts.append("Action: Extract answer from top relevant documents.")
+        thoughts.append("Action: Pass top relevant chunks through the answer generator.")
         context = self._build_context(usable[:4])
         answer  = self.extractor.extract(query, context)
 
@@ -279,6 +312,17 @@ class GeneralReActAgent:
             else:
                 lines.append(f"📄 {title} *(relevance: {score})*")
         return "\n".join(lines) if lines else ""
+
+    def run_safe(self, query: str) -> dict:
+        """
+        Safe wrapper around run() — catches all exceptions and returns an
+        empty result dict so callers do not need their own try/except.
+        """
+        try:
+            return self.run(query)
+        except Exception as exc:
+            logger.warning("[GeneralReActAgent] run_safe error for '%s': %s", query, exc)
+            return self._empty([f"Error in GeneralReActAgent: {exc}"])
 
     def _empty(self, thoughts: list[str]) -> dict:
         return {

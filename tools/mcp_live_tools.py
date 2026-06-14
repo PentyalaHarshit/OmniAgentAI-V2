@@ -18,6 +18,7 @@ All tools follow the same MCP contract:
 import re
 import json
 import logging
+import os
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -152,7 +153,7 @@ class WeatherTool:
 
 class NewsTool:
     name = "news"
-    description = "Fetches latest news headlines from Google News RSS for any topic."
+    description = "Fetches latest news headlines from NewsAPI.org when configured, otherwise Google News RSS."
     input_schema = {"query": "string – news topic or question"}
 
     TRIGGERS = re.compile(
@@ -170,6 +171,12 @@ class NewsTool:
             query, flags=re.I
         ).strip()
         topic = re.sub(r"\s+", " ", topic).strip() or query
+
+        newsapi_key = os.getenv("NEWSAPI_KEY", "").strip()
+        if newsapi_key:
+            newsapi_result = self._newsapi(topic, newsapi_key)
+            if newsapi_result:
+                return newsapi_result
 
         url = ("https://news.google.com/rss/search?"
                + urllib.parse.urlencode({"q": topic, "hl": "en-US", "gl": "US", "ceid": "US:en"}))
@@ -196,6 +203,37 @@ class NewsTool:
                 lines.append(f"- [{title}]({link}) *{pub}*")
 
         return "\n".join(lines) + "\n\n*Source: Google News RSS*"
+
+    def _newsapi(self, topic: str, api_key: str) -> str:
+        url = (
+            "https://newsapi.org/v2/everything?"
+            + urllib.parse.urlencode({
+                "q": topic,
+                "language": "en",
+                "sortBy": "publishedAt",
+                "pageSize": 5,
+                "apiKey": api_key,
+            })
+        )
+        data = _get(url)
+        if not data or data.get("status") != "ok":
+            return ""
+
+        articles = data.get("articles", [])[:5]
+        if not articles:
+            return ""
+
+        lines = [f"ðŸ“° **Latest News: {topic.title()}**\n"]
+        for article in articles:
+            title = _strip_html(article.get("title", ""))
+            link = article.get("url", "")
+            source = article.get("source", {}).get("name", "")
+            published = (article.get("publishedAt") or "")[:10]
+            if title and link:
+                suffix = " ".join(p for p in [source, published] if p)
+                lines.append(f"- [{title}]({link}) *{suffix}*")
+
+        return "\n".join(lines) + "\n\n*Source: NewsAPI.org*"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -450,3 +488,154 @@ class EarthquakeTool:
 
         lines.append("\n*Source: [USGS Earthquake Hazards Program](https://earthquake.usgs.gov)*")
         return "\n".join(lines)
+
+
+class SearchAPITool:
+    name = "search"
+    description = "Searches the web using SerpApi when configured, otherwise DuckDuckGo Instant Answer API."
+    input_schema = {"query": "string - explicit web/search question"}
+
+    TRIGGERS = re.compile(
+        r"\b(search|web search|look up|lookup|find online|sources for|source for|google)\b",
+        re.I,
+    )
+
+    def __init__(self):
+        self.serpapi_key = os.getenv("SERPAPI_API_KEY", "").strip()
+
+    def execute(self, query: str) -> str:
+        if not self.TRIGGERS.search(query):
+            return ""
+
+        search_query = self._clean_query(query)
+        if not search_query:
+            return ""
+
+        if self.serpapi_key:
+            result = self._serpapi(search_query)
+            if result:
+                return result
+
+        return self._duckduckgo(search_query)
+
+    def _clean_query(self, query: str) -> str:
+        cleaned = re.sub(
+            r"\b(please|can you|could you|search|web search|look up|lookup|find online|google|for|me)\b",
+            " ",
+            query,
+            flags=re.I,
+        )
+        cleaned = re.sub(r"\s+", " ", cleaned).strip(" ?.")
+        return cleaned or query.strip(" ?.")
+
+    def _serpapi(self, query: str) -> str:
+        url = (
+            "https://serpapi.com/search.json?"
+            + urllib.parse.urlencode({
+                "engine": "google",
+                "q": query,
+                "num": 5,
+                "api_key": self.serpapi_key,
+            })
+        )
+        data = _get(url)
+        if not data:
+            return ""
+
+        results = data.get("organic_results", [])[:5]
+        if not results:
+            return ""
+
+        lines = [f"**Search Results: {query}**", ""]
+        for item in results:
+            title = _strip_html(item.get("title", "Untitled"))
+            link = item.get("link", "")
+            snippet = _strip_html(item.get("snippet", ""))
+            if title and link:
+                lines.append(f"- [{title}]({link})")
+                if snippet:
+                    lines.append(f"  {snippet}")
+
+        lines.append("\n*Source: SerpApi Google Search API*")
+        return "\n".join(lines)
+
+    def _duckduckgo(self, query: str) -> str:
+        url = (
+            "https://api.duckduckgo.com/?"
+            + urllib.parse.urlencode({
+                "q": query,
+                "format": "json",
+                "no_html": "1",
+                "skip_disambig": "1",
+            })
+        )
+        data = _get(url)
+        if not data:
+            return ""
+
+        lines = [f"**Search Result: {query}**", ""]
+        abstract = _strip_html(data.get("AbstractText", ""))
+        abstract_url = data.get("AbstractURL", "")
+        heading = data.get("Heading", query)
+        if abstract:
+            if abstract_url:
+                lines.append(f"- [{heading}]({abstract_url})")
+            else:
+                lines.append(f"- {heading}")
+            lines.append(f"  {abstract}")
+
+        related = data.get("RelatedTopics", [])
+        for item in related:
+            if len(lines) >= 9:
+                break
+            if not isinstance(item, dict):
+                continue
+            text = _strip_html(item.get("Text", ""))
+            link = item.get("FirstURL", "")
+            if text and link:
+                lines.append(f"- [{text[:140]}]({link})")
+
+        if len(lines) <= 2:
+            return ""
+
+        lines.append("\n*Source: DuckDuckGo Instant Answer API*")
+        return "\n".join(lines)
+
+
+class LiveAPIRunner:
+    """
+    Runs real/live API tools before the slower open-domain RAG path.
+
+    Contract:
+        run(query) -> {"answer": str, "tool_used": str, "all_results": list}
+    """
+
+    def __init__(self):
+        self.tools = [
+            WeatherTool(),
+            NewsTool(),
+            SportsTool(),
+            SearchAPITool(),
+            TrendingTool(),
+            CurrencyTool(),
+            EarthquakeTool(),
+        ]
+
+    def run(self, query: str) -> dict:
+        all_results = []
+        for tool in self.tools:
+            try:
+                result = tool.execute(query)
+            except Exception as e:
+                logger.warning("Live API tool %s raised: %s", tool.name, e)
+                result = ""
+
+            all_results.append({"tool": tool.name, "result": result})
+            if result:
+                return {
+                    "answer": result,
+                    "tool_used": tool.name,
+                    "all_results": all_results,
+                }
+
+        return {"answer": "", "tool_used": "", "all_results": all_results}

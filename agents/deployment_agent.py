@@ -22,6 +22,8 @@ class DeploymentAgent(BaseAgent):
             "Generate docker-compose.yml",
             "Generate Kubernetes manifests (if needed)",
             "Generate CI/CD pipeline (if needed)",
+            "Generate Nginx reverse proxy config (if needed)",
+            "Generate AWS EC2 bootstrap script (if needed)",
             "Generate .env.example",
             "Produce run/deploy instructions",
             "Review all files for correctness",
@@ -50,15 +52,25 @@ class DeploymentAgent(BaseAgent):
         parts.append(f"### 📄 docker-compose.yml\n```yaml\n{files['docker-compose.yml'].strip()}\n```\n")
 
         # K8s manifests only if generated
-        if files["kubernetes_manifests"]:
+        if files.get("kubernetes_manifests"):
             parts.append(
                 f"### ☸️ Kubernetes Manifests\n```yaml\n{files['kubernetes_manifests'].strip()}\n```\n"
             )
 
         # CI/CD only if generated
-        if files["github_actions"]:
+        if files.get("github_actions"):
             parts.append(
                 f"### ⚙️ GitHub Actions Workflow\n```yaml\n{files['github_actions'].strip()}\n```\n"
+            )
+
+        if files.get("nginx.conf"):
+            parts.append(
+                f"### Nginx Reverse Proxy\n```nginx\n{files['nginx.conf'].strip()}\n```\n"
+            )
+
+        if files.get("aws_ec2_user_data"):
+            parts.append(
+                f"### AWS EC2 User Data\n```bash\n{files['aws_ec2_user_data'].strip()}\n```\n"
             )
 
         # .env.example

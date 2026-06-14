@@ -19,6 +19,11 @@ PYTHON_BIN = os.getenv("PYTHON_BIN", "python")
 MAX_SELF_CORRECT_ROUNDS = int(os.getenv("MAX_SELF_CORRECT_ROUNDS", "2"))
 KNOWLEDGE_DIR = "knowledge"
 
+# Real/live API providers
+HOTEL_PROVIDER = os.getenv("HOTEL_PROVIDER", "demo").lower()
+SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY", "")
+NEWSAPI_KEY = os.getenv("NEWSAPI_KEY", "")
+
 
 LLM_TREE_MAX_WORKERS = int(os.getenv("LLM_TREE_MAX_WORKERS", "5"))
 LLM_TREE_MODEL_TIMEOUT = int(os.getenv("LLM_TREE_MODEL_TIMEOUT", "90"))

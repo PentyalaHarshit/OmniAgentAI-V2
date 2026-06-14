@@ -389,6 +389,94 @@ jobs:
     return template.format(app_name=app_name)
 
 
+def gen_nginx(fw: dict, app_name: str) -> str:
+    port = fw["port"]
+    return f"""# nginx/{app_name}.conf
+server {{
+    listen 80;
+    server_name _;
+
+    client_max_body_size 25m;
+
+    location / {{
+        proxy_pass http://127.0.0.1:{port};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 300;
+    }}
+
+    location /health {{
+        proxy_pass http://127.0.0.1:{port}/health;
+        access_log off;
+    }}
+}}
+"""
+
+
+def gen_aws_ec2(fw: dict, app_name: str) -> str:
+    port = fw["port"]
+    return f"""# aws/ec2-user-data.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_NAME="{app_name}"
+APP_DIR="/opt/${{APP_NAME}}"
+
+apt-get update -y
+apt-get install -y ca-certificates curl git nginx
+
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list
+apt-get update -y
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+systemctl enable --now docker
+systemctl enable --now nginx
+
+mkdir -p "$APP_DIR"
+cd "$APP_DIR"
+
+# Replace this with your repo URL or copy files onto the instance.
+# git clone https://github.com/your-org/{app_name}.git .
+
+cat >/etc/nginx/sites-available/$APP_NAME <<'NGINX'
+server {{
+    listen 80;
+    server_name _;
+
+    location / {{
+        proxy_pass http://127.0.0.1:{port};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }}
+
+    location /health {{
+        proxy_pass http://127.0.0.1:{port}/health;
+        access_log off;
+    }}
+}}
+NGINX
+
+ln -sf /etc/nginx/sites-available/$APP_NAME /etc/nginx/sites-enabled/$APP_NAME
+rm -f /etc/nginx/sites-enabled/default
+nginx -t
+systemctl reload nginx
+
+if [ -f docker-compose.yml ]; then
+  docker compose up --build -d
+fi
+"""
+
+
 def gen_env_example(fw: dict, app_name: str) -> str:
     lang = fw["lang"]
     base = f"""# ── .env.example ──────────────────────────────────────────────────────
@@ -490,6 +578,35 @@ def gen_run_instructions(fw: dict, app_name: str, platform: str) -> str:
             "Push to `main` branch — the workflow runs tests, builds, and deploys automatically.",
         ]
 
+    elif platform == "aws":
+        lines += [
+            "## AWS EC2 Prerequisites",
+            "- Ubuntu 22.04 EC2 instance",
+            "- Security group allows inbound ports 22, 80, and 443",
+            "- SSH key pair for the instance",
+            "- Optional: DNS A record pointing to the EC2 public IP",
+            "",
+            "## Steps",
+            "```bash",
+            "# 1. SSH into the instance",
+            "ssh -i path/to/key.pem ubuntu@EC2_PUBLIC_IP",
+            "",
+            "# 2. Install Docker, Docker Compose, and Nginx",
+            "sudo bash aws/ec2-user-data.sh",
+            "",
+            "# 3. Copy project files or clone your repo",
+            f"cd /opt/{app_name}",
+            "cp .env.example .env",
+            "# Edit .env with production values",
+            "",
+            "# 4. Start containers",
+            "docker compose up --build -d",
+            "",
+            "# 5. Validate and reload Nginx",
+            "sudo nginx -t && sudo systemctl reload nginx",
+            "```",
+        ]
+
     return "\n".join(lines)
 
 
@@ -501,6 +618,7 @@ class DeploymentCrew:
 
     def run(self, query: str) -> dict:
         steps = []
+        q = query.lower()
 
         # Agent 1: RAG
         rag = self.rag.search(query, "coding")
@@ -508,6 +626,8 @@ class DeploymentCrew:
 
         # Agent 2: Stack & platform detection
         stack = detect_stack(query)
+        if any(kw in q for kw in ("aws", "ec2", "elastic compute")):
+            stack["platform"] = "aws"
         fw = stack["framework"]
         platform = stack["platform"]
         app_name = stack["app_name"]
@@ -527,30 +647,46 @@ class DeploymentCrew:
 
         # Agent 5: K8s manifests (only if requested)
         k8s = ""
-        if platform == "kubernetes":
+        if platform == "kubernetes" or any(kw in q for kw in ("kubernetes", "k8s", "kubectl", "helm")):
             k8s = gen_k8s(fw, app_name)
             steps.append({"thought": "K8sAgent: generate Kubernetes manifests", "output": "generated"})
 
-        # Agent 6: CI/CD (only if requested)
+        # Agent 6: CI/CD (if requested or useful for AWS image deploys)
         cicd = ""
-        if platform == "github_actions":
+        if platform in ("github_actions", "aws") or any(kw in q for kw in ("github actions", "ci/cd")):
             cicd = gen_github_actions(fw, app_name)
             steps.append({"thought": "CIAgent: generate GitHub Actions workflow", "output": "generated"})
 
-        # Agent 7: .env.example
+        # Agent 7: Nginx reverse proxy (if requested or needed by AWS EC2)
+        nginx = ""
+        if platform == "aws" or "nginx" in q or "ec2" in q:
+            nginx = gen_nginx(fw, app_name)
+            steps.append({"thought": "NginxAgent: generate Nginx reverse proxy config", "output": "generated"})
+
+        # Agent 8: AWS EC2 bootstrap (only if requested)
+        aws_ec2 = ""
+        if platform == "aws" or any(kw in q for kw in ("aws", "ec2", "elastic compute")):
+            aws_ec2 = gen_aws_ec2(fw, app_name)
+            steps.append({"thought": "AWSAgent: generate EC2 user-data bootstrap script", "output": "generated"})
+
+        # Agent 9: .env.example
         env_example = gen_env_example(fw, app_name)
         steps.append({"thought": "EnvAgent: generate .env.example", "output": "generated"})
 
-        # Agent 8: Run instructions
+        # Agent 10: Run instructions
         run_instructions = gen_run_instructions(fw, app_name, platform)
         steps.append({"thought": "RunInstructionsAgent: generate deploy commands", "output": "generated"})
 
-        # Agent 9: Reviewer
+        # Agent 11: Reviewer
         issues = []
         if "EXPOSE" not in dockerfile:
             issues.append("Dockerfile missing EXPOSE")
         if "healthcheck" not in compose.lower():
             issues.append("docker-compose.yml missing healthcheck")
+        if platform == "aws" and "docker compose up" not in aws_ec2:
+            issues.append("AWS EC2 script missing docker compose startup")
+        if nginx and "proxy_pass" not in nginx:
+            issues.append("Nginx config missing proxy_pass")
         steps.append({
             "thought": "ReviewerAgent: self-check all files",
             "output": {"issues": issues or ["All files look good ✓"]}
@@ -566,6 +702,8 @@ class DeploymentCrew:
                 "docker-compose.yml": compose,
                 "kubernetes_manifests": k8s,
                 "github_actions": cicd,
+                "nginx.conf": nginx,
+                "aws_ec2_user_data": aws_ec2,
                 ".env.example": env_example,
             },
             "run_instructions": run_instructions,

@@ -11,7 +11,7 @@ import re
 import logging
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -155,9 +155,19 @@ class QueryRewriter:
 class WebSearchTool:
     """Searches DuckDuckGo HTML for multiple query variants."""
 
-    def __init__(self, timeout: int = _TIMEOUT, results_per_query: int = 5):
+    def __init__(
+        self,
+        timeout: int = _TIMEOUT,
+        results_per_query: int = 5,
+        max_pages_to_fetch: int = 10,
+        chunk_chars: int = 900,
+        chunk_overlap: int = 120,
+    ):
         self.timeout           = timeout
         self.results_per_query = results_per_query
+        self.max_pages_to_fetch = max_pages_to_fetch
+        self.chunk_chars = chunk_chars
+        self.chunk_overlap = chunk_overlap
 
     def search_one(self, query: str) -> list[dict]:
         docs: list[dict] = []
@@ -214,3 +224,90 @@ class WebSearchTool:
                     all_docs.append(doc)
 
         return all_docs
+
+    def fetch_page_text(self, url: str) -> str:
+        """Fetch a search result page and return readable text."""
+        if not url or not url.startswith(("http://", "https://")):
+            return ""
+
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"}:
+            return ""
+
+        try:
+            resp = requests.get(url, timeout=self.timeout, headers=_HEADERS)
+            content_type = resp.headers.get("content-type", "").lower()
+            if not resp.ok or "text/html" not in content_type:
+                return ""
+            return self._extract_readable_text(resp.text)
+        except requests.RequestException as e:
+            logger.debug("[WebSearch] Page fetch failed '%s': %s", url, e)
+            return ""
+        except Exception as e:
+            logger.debug("[WebSearch] Page parse failed '%s': %s", url, e)
+            return ""
+
+    def enrich_with_page_chunks(self, docs: list[dict]) -> list[dict]:
+        """
+        Open retrieved links, extract readable page text, split into chunks,
+        and return chunk documents that can be ranked against the query.
+        """
+        chunks: list[dict] = []
+        for doc in docs[: self.max_pages_to_fetch]:
+            page_text = self.fetch_page_text(doc.get("url", ""))
+            text = page_text or doc.get("text", "")
+            doc_chunks = self.chunk_text(text)
+            if not doc_chunks and doc.get("text"):
+                doc_chunks = [doc["text"]]
+
+            for idx, chunk in enumerate(doc_chunks, start=1):
+                chunks.append({
+                    "title": doc.get("title", ""),
+                    "url": doc.get("url", ""),
+                    "text": chunk,
+                    "source": doc.get("source", "Web"),
+                    "query_variant": doc.get("query_variant", ""),
+                    "chunk_index": idx,
+                    "chunk_count": len(doc_chunks),
+                    "page_chars": len(page_text),
+                })
+        return chunks
+
+    def chunk_text(self, text: str) -> list[str]:
+        """Split page text into overlapping chunks while preserving sentence boundaries."""
+        cleaned = re.sub(r"\s+", " ", text or "").strip()
+        if not cleaned:
+            return []
+        if len(cleaned) <= self.chunk_chars:
+            return [cleaned]
+
+        sentences = re.split(r"(?<=[.!?])\s+", cleaned)
+        chunks: list[str] = []
+        current = ""
+        for sentence in sentences:
+            if not sentence:
+                continue
+            if current and len(current) + 1 + len(sentence) > self.chunk_chars:
+                chunks.append(current.strip())
+                overlap = current[-self.chunk_overlap:].strip()
+                current = f"{overlap} {sentence}".strip() if overlap else sentence
+            else:
+                current = f"{current} {sentence}".strip() if current else sentence
+        if current:
+            chunks.append(current.strip())
+        return chunks
+
+    @staticmethod
+    def _extract_readable_text(html: str, max_chars: int = 8000) -> str:
+        soup = BeautifulSoup(html, "html.parser")
+        for tag in soup(["script", "style", "noscript", "header", "footer", "nav", "form"]):
+            tag.decompose()
+
+        parts: list[str] = []
+        for tag in soup.find_all(["h1", "h2", "h3", "p", "li", "td"], limit=220):
+            text = re.sub(r"\s+", " ", tag.get_text(" ", strip=True)).strip()
+            if len(text) >= 35:
+                parts.append(text)
+            if sum(len(p) for p in parts) >= max_chars:
+                break
+        return " ".join(parts)[:max_chars].strip()

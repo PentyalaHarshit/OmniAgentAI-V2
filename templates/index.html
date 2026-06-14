@@ -19,7 +19,15 @@
       </div>
     </div>
 
-    <button class="new-chat" onclick="resetChat()">+ New Chat</button>
+    <button class="new-chat" onclick="createNewChat()">+ New Chat</button>
+
+    <div class="side-section">
+      <div class="section-row">
+        <h3>CHAT HISTORY</h3>
+        <button class="mini-btn" onclick="clearCurrentChat()">Clear</button>
+      </div>
+      <div id="conversationList" class="conversation-list"></div>
+    </div>
 
     <div class="side-section">
       <h3>FILES</h3>
@@ -51,8 +59,14 @@
   <main class="chat-main">
 
     <header class="chat-header">
-      <h1>OmniAgentAI</h1>
-      <p>Talk naturally. Upload files. Agents ask follow-up questions like a human assistant.</p>
+      <div>
+        <h1>OmniAgentAI</h1>
+        <p id="sessionLabel">New chat</p>
+      </div>
+      <div class="header-actions">
+        <div id="headerAgentBadge" class="agent-badge">General</div>
+        <button class="mini-btn source-toggle-btn" onclick="toggleSources()">Sources</button>
+      </div>
     </header>
 
     <div id="chatMessages" class="chat-messages">
@@ -74,26 +88,6 @@
       </div>
     </div>
 
-    <!-- Details panel -->
-    <section id="detailsPanel" class="details-panel hidden">
-      <div class="meta">
-        <span id="best_model"></span>
-        <span id="best_score"></span>
-        <span id="llm_latency"></span>
-        <span id="route"></span>
-        <span id="agent"></span>
-        <span id="file_used"></span>
-      </div>
-      <details id="scoresDetails">
-        <summary>Show LLM tree scores</summary>
-        <div id="scores"></div>
-      </details>
-      <details id="thoughtsDetails">
-        <summary>Show agent thoughts</summary>
-        <ol id="thoughts"></ol>
-      </details>
-    </section>
-
     <!-- Composer -->
     <div class="composer-wrap">
       <div id="attachedFilePill" class="attached-file hidden"></div>
@@ -109,10 +103,122 @@
     </div>
 
   </main>
+
+  <aside class="source-panel" id="sourcePanel">
+    <div class="source-header">
+      <div>
+        <h2>Sources</h2>
+        <p>Route, evidence, and agent trace</p>
+      </div>
+      <button class="mini-btn" onclick="toggleSources()">Hide</button>
+    </div>
+
+    <div class="source-card">
+      <div class="source-label">Active agent</div>
+      <div id="activeAgentBadge" class="agent-badge wide">Waiting</div>
+      <div class="source-meta-grid">
+        <span id="route">Route: -</span>
+        <span id="agent">Agent: -</span>
+        <span id="best_model">LLM: -</span>
+        <span id="best_score">Score: -</span>
+        <span id="llm_latency">Time: -</span>
+        <span id="file_used">File: false</span>
+      </div>
+    </div>
+
+    <div class="source-card">
+      <div class="source-label">Source links</div>
+      <div id="sourceLinks" class="source-links empty">No sources yet.</div>
+    </div>
+
+    <details id="scoresDetails" class="source-details">
+      <summary>LLM tree scores</summary>
+      <div id="scores"></div>
+    </details>
+
+    <details id="thoughtsDetails" class="source-details">
+      <summary>Agent thoughts</summary>
+      <ol id="thoughts"></ol>
+    </details>
+  </aside>
 </div>
 
 <script>
-const SESSION_ID = "default";
+let SESSION_ID = localStorage.getItem("omni_active_session") || createSessionId();
+let conversations = loadConversationIndex();
+const welcomeHtml = `
+    <div class="message assistant">
+      <div class="avatar">AI</div>
+      <div class="bubble">
+        <div class="message-meta"><span class="agent-badge">General</span></div>
+        Hi! I can help with <b>travel, healthcare, hotels, movies, coding, shopping, research, resume</b>, and general knowledge questions.
+        <br><br>Upload a file or ask a question to begin.
+      </div>
+    </div>`;
+
+function createSessionId() {
+  return "sess_" + Math.random().toString(36).slice(2, 10);
+}
+
+function loadConversationIndex() {
+  try { return JSON.parse(localStorage.getItem("omni_conversations") || "[]"); }
+  catch (_) { return []; }
+}
+
+function saveConversationIndex() {
+  localStorage.setItem("omni_conversations", JSON.stringify(conversations.slice(0, 30)));
+  localStorage.setItem("omni_active_session", SESSION_ID);
+}
+
+function ensureConversation(title = "New chat") {
+  const existing = conversations.find(c => c.id === SESSION_ID);
+  if (!existing) {
+    conversations.unshift({ id: SESSION_ID, title, updated_at: Date.now() });
+  }
+  saveConversationIndex();
+  renderConversationList();
+}
+
+function updateConversationTitle(query) {
+  const c = conversations.find(item => item.id === SESSION_ID);
+  if (!c) return;
+  if (!c.title || c.title === "New chat") {
+    c.title = query.slice(0, 42) + (query.length > 42 ? "..." : "");
+  }
+  c.updated_at = Date.now();
+  conversations = [c, ...conversations.filter(item => item.id !== SESSION_ID)];
+  saveConversationIndex();
+  renderConversationList();
+}
+
+function renderConversationList() {
+  const list = document.getElementById("conversationList");
+  list.innerHTML = "";
+  ensureConversationOnly();
+  conversations.forEach(c => {
+    const btn = document.createElement("button");
+    btn.className = "conversation-item" + (c.id === SESSION_ID ? " active" : "");
+    btn.textContent = c.title || "New chat";
+    btn.onclick = () => switchConversation(c.id);
+    list.appendChild(btn);
+  });
+  const active = conversations.find(c => c.id === SESSION_ID);
+  document.getElementById("sessionLabel").textContent = active?.title || "New chat";
+}
+
+function ensureConversationOnly() {
+  if (!conversations.find(c => c.id === SESSION_ID)) {
+    conversations.unshift({ id: SESSION_ID, title: "New chat", updated_at: Date.now() });
+    saveConversationIndex();
+  }
+}
+
+async function switchConversation(id) {
+  SESSION_ID = id;
+  saveConversationIndex();
+  renderConversationList();
+  await loadHistory();
+}
 
 function autoResize(el) {
   el.style.height = "auto";
@@ -130,6 +236,13 @@ function renderMarkdown(text) {
     checkoutHtml = buildCheckoutForm(get("PRODUCT_NAME"), get("PRODUCT_PRICE"), get("AMAZON_LINK"), get("ESTIMATED_DELIVERY"));
   }
 
+  const infoCardMatch = text.match(/---INFO_CARD---([\s\S]*?)---END_INFO_CARD---/);
+  let infoCardHtml = "";
+  if (infoCardMatch) {
+    text = text.replace(/---INFO_CARD---[\s\S]*?---END_INFO_CARD---/, "");
+    infoCardHtml = buildInfoCard(infoCardMatch[1]);
+  }
+
   let s = text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -143,7 +256,79 @@ function renderMarkdown(text) {
   s = s.replace(/(^|\n)[•\-] (.+)/g, "$1<li>$2</li>");
   s = s.replace(/(<li>.*<\/li>)/gs, "<ul>$1</ul>");
   s = s.replace(/\n/g, "<br>");
-  return s + checkoutHtml;
+  return s + infoCardHtml + checkoutHtml;
+}
+
+function parseBlock(block) {
+  const data = {};
+  let currentKey = "";
+  block.split(/\r?\n/).forEach(line => {
+    const m = line.match(/^([A-Za-z0-9_]+):\s*(.*)$/);
+    if (m) {
+      currentKey = m[1];
+      data[currentKey] = m[2] || "";
+    } else if (currentKey && line.trim()) {
+      data[currentKey] += "\n" + line.trim();
+    }
+  });
+  return data;
+}
+
+function inlineMarkdown(text) {
+  return escapeHtml(text || "")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\n/g, "<br>");
+}
+
+function cardIcon(name) {
+  const icons = { calendar: "▣", crown: "♛", user: "●" };
+  return icons[name] || "•";
+}
+
+function buildInfoCard(block) {
+  const data = parseBlock(block);
+  const sections = [1, 2, 3].map(i => {
+    const title = data[`section${i}_title`];
+    const body = data[`section${i}_body`];
+    if (!title || !body) return "";
+    const lines = body.split("\\n").map(x => x.trim()).filter(Boolean);
+    const bodyHtml = lines.length > 1
+      ? `<ul>${lines.map(x => `<li>${inlineMarkdown(x)}</li>`).join("")}</ul>`
+      : `<p>${inlineMarkdown(body)}</p>`;
+    return `<div class="info-section">
+      <div class="info-icon">${cardIcon(data[`section${i}_icon`])}</div>
+      <div><h4>${escapeHtml(title)}</h4>${bodyHtml}</div>
+    </div>`;
+  }).join("");
+
+  const sources = [1, 2, 3].map(i => {
+    const title = data[`source${i}_title`];
+    const url = data[`source${i}_url`];
+    if (!title || !url) return "";
+    return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>`;
+  }).join("");
+
+  const image = data.image_url
+    ? `<figure class="info-media">
+        <img src="${escapeHtml(data.image_url)}" alt="${escapeHtml(data.image_caption || data.title || "Image")}">
+        ${data.image_caption ? `<figcaption>${escapeHtml(data.image_caption)}</figcaption>` : ""}
+      </figure>`
+    : "";
+
+  return `<article class="info-card">
+    <div class="info-top">
+      <div class="info-main">
+        <p class="info-title">${inlineMarkdown(data.title || "")}</p>
+        ${sections}
+      </div>
+      ${image}
+    </div>
+    ${sources ? `<div class="info-sources"><h4>Sources</h4><div>${sources}</div></div>` : ""}
+    <div class="info-verify">
+      <span><strong>Verified:</strong> ${escapeHtml(data.verified || "Checked.")}</span>
+      <span><strong>Confidence:</strong> ${escapeHtml(data.confidence || "High")}</span>
+    </div>
+  </article>`;
 }
 
 function buildCheckoutForm(productName, productPrice, amazonLink, estimatedDelivery) {
@@ -186,7 +371,7 @@ function buildCheckoutForm(productName, productPrice, amazonLink, estimatedDeliv
     <div class="checkout-actions">
       <button class="checkout-btn-amazon" onclick="confirmOrder('${amazonLink}', '${productName}', '${productPrice}')">
         <img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" alt="Amazon" height="18" style="vertical-align:middle;margin-right:6px">
-        Confirm &amp; Place Order via Amazon
+        Prepare Review Only
       </button>
       <button class="checkout-btn-cancel" onclick="cancelOrder()">Cancel</button>
     </div>
@@ -225,7 +410,7 @@ function confirmOrder(amazonLink, productName, productPrice) {
 
   const last4 = cardNum.replace(/\s/g,"").slice(-4);
   showCheckoutResult(
-    `✅ <strong>Order confirmed! (Demo)</strong><br>
+    `✅ <strong>Order prepared for review only.</strong><br>
      📦 <strong>${productName}</strong> — ${productPrice}<br>
      📍 Delivering to: ${street}, ${city}, ${state} ${zip}, ${country}<br>
      💳 Card ending in <strong>${last4}</strong><br>
@@ -234,7 +419,7 @@ function confirmOrder(amazonLink, productName, productPrice) {
         style="color:#f90;font-weight:bold">
        🔗 View on Amazon →
      </a><br>
-     <small style="color:#aaa">Demo only — no real order was placed or charged.</small>`,
+     <small style="color:#aaa">Demo only. No real order was placed, booked, or charged. Explicit confirmation is required outside this demo.</small>`,
     "success"
   );
 }
@@ -254,7 +439,13 @@ function escapeHtml(t) {
   return (t || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 
-function addMessage(role, content) {
+function agentLabelFromData(data) {
+  const agent = data?.agent_result?.agent || data?.agent_result?.router?.selected_leaf_agent || "Assistant";
+  const route = data?.agent_result?.router?.route || data?.agent_result?.extra?.source_stage || "";
+  return route ? `${agent} / ${route}` : agent;
+}
+
+function addMessage(role, content, meta = {}) {
   const container = document.getElementById("chatMessages");
   const msg = document.createElement("div");
   msg.className = "message " + role;
@@ -265,7 +456,13 @@ function addMessage(role, content) {
 
   const bubble = document.createElement("div");
   bubble.className = "bubble";
-  bubble.innerHTML = renderMarkdown(content);
+  const badge = role === "assistant"
+    ? `<div class="message-meta"><span class="agent-badge">${escapeHtml(meta.agent || "Assistant")}</span></div>`
+    : "";
+  bubble.innerHTML = badge + renderMarkdown(content);
+  if (bubble.querySelector(".info-card")) {
+    bubble.classList.add("rich-bubble");
+  }
 
   msg.appendChild(avatar);
   msg.appendChild(bubble);
@@ -349,6 +546,7 @@ async function askAgent() {
   if (!query) return;
 
   addMessage("user", query);
+  updateConversationTitle(query);
   textarea.value = "";
   textarea.style.height = "auto";
   showTyping();
@@ -359,24 +557,35 @@ async function askAgent() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query, file_id, session_id: SESSION_ID })
     });
-    const data = await res.json();
+    const raw = await res.text();
+    let data = {};
+    try { data = raw ? JSON.parse(raw) : {}; }
+    catch (_) { data = { error: raw || res.statusText }; }
+    if (!res.ok) {
+      throw new Error(data.error || data.detail || `Server returned ${res.status}`);
+    }
     removeTyping();
-    addMessage("assistant", data.final_answer || "Sorry, I couldn't find an answer.");
+    addMessage("assistant", data.final_answer || "Sorry, I couldn't find an answer.", {
+      agent: agentLabelFromData(data)
+    });
     renderDetails(data);
   } catch (e) {
     removeTyping();
-    addMessage("assistant", "⚠️ Network error. Please check the server.");
+    addMessage("assistant", `⚠️ ${e.message || "Network error. Please check the server."}`);
   }
 }
 
 function renderDetails(data) {
-  document.getElementById("detailsPanel").classList.remove("hidden");
+  const agentLabel = agentLabelFromData(data);
+  document.getElementById("headerAgentBadge").textContent = agentLabel;
+  document.getElementById("activeAgentBadge").textContent = agentLabel;
   document.getElementById("best_model").textContent  = "LLM: "       + (data.llm_tree?.best_model ?? "");
   document.getElementById("best_score").textContent  = "Score: "     + (data.llm_tree?.best_score ?? "");
   document.getElementById("llm_latency").textContent = "LLM time: "  + (data.llm_tree?.total_latency_seconds ?? "n/a") + "s";
   document.getElementById("route").textContent       = "Route: "     + (data.agent_result?.router?.route ?? "");
   document.getElementById("agent").textContent       = "Agent: "     + (data.agent_result?.agent ?? "");
   document.getElementById("file_used").textContent   = "File used: " + data.file_context_used;
+  renderSourceLinks(data);
 
   const scores = document.getElementById("scores");
   scores.innerHTML = "";
@@ -400,21 +609,126 @@ function renderDetails(data) {
   document.getElementById("thoughtsDetails").open = false;
 }
 
-async function resetChat() {
+function extractLinks(text) {
+  const links = [];
+  const re = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g;
+  let m;
+  while ((m = re.exec(text || "")) !== null) {
+    links.push({ title: m[1], url: m[2] });
+  }
+  return links;
+}
+
+function renderSourceLinks(data) {
+  const box = document.getElementById("sourceLinks");
+  const links = [];
+  const answer = data.final_answer || data.agent_result?.answer || "";
+  links.push(...extractLinks(answer));
+  const cardMatch = answer.match(/---INFO_CARD---([\s\S]*?)---END_INFO_CARD---/);
+  if (cardMatch) {
+    const card = parseBlock(cardMatch[1]);
+    [1, 2, 3].forEach(i => {
+      if (card[`source${i}_title`] && card[`source${i}_url`]) {
+        links.push({ title: card[`source${i}_title`], url: card[`source${i}_url`] });
+      }
+    });
+  }
+
+  const tools = data.agent_result?.extra?.mcp_tools || [];
+  tools.forEach(item => {
+    const result = item.result || {};
+    if (typeof result === "string") {
+      links.push(...extractLinks(result));
+    } else if (result.url) {
+      links.push({ title: result.title || item.tool || "Source", url: result.url });
+    }
+  });
+
+  const seen = new Set();
+  const unique = links.filter(link => {
+    if (!link.url || seen.has(link.url)) return false;
+    seen.add(link.url);
+    return true;
+  }).slice(0, 8);
+
+  if (!unique.length) {
+    box.className = "source-links empty";
+    box.textContent = "No external source links for this answer.";
+    return;
+  }
+
+  box.className = "source-links";
+  box.innerHTML = "";
+  unique.forEach(link => {
+    const a = document.createElement("a");
+    a.href = link.url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = link.title;
+    box.appendChild(a);
+  });
+}
+
+function toggleSources() {
+  document.querySelector(".app-shell").classList.toggle("sources-collapsed");
+  document.getElementById("sourcePanel").classList.toggle("collapsed");
+}
+
+async function createNewChat() {
+  SESSION_ID = createSessionId();
+  ensureConversation("New chat");
+  saveConversationIndex();
+  document.getElementById("chatMessages").innerHTML = welcomeHtml;
+  renderConversationList();
+  resetSourcePanel();
+}
+
+async function clearCurrentChat() {
   await fetch("/reset", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ session_id: SESSION_ID })
   });
-  document.getElementById("chatMessages").innerHTML = `
-    <div class="message assistant">
-      <div class="avatar">AI</div>
-      <div class="bubble">New chat started. How can I help?</div>
-    </div>`;
-  document.getElementById("detailsPanel").classList.add("hidden");
+  document.getElementById("chatMessages").innerHTML = welcomeHtml;
+  const c = conversations.find(item => item.id === SESSION_ID);
+  if (c) c.title = "New chat";
+  saveConversationIndex();
+  renderConversationList();
+  resetSourcePanel();
 }
 
+function resetSourcePanel() {
+  document.getElementById("headerAgentBadge").textContent = "General";
+  document.getElementById("activeAgentBadge").textContent = "Waiting";
+  document.getElementById("route").textContent = "Route: -";
+  document.getElementById("agent").textContent = "Agent: -";
+  document.getElementById("best_model").textContent = "LLM: -";
+  document.getElementById("best_score").textContent = "Score: -";
+  document.getElementById("llm_latency").textContent = "Time: -";
+  document.getElementById("file_used").textContent = "File: false";
+  document.getElementById("sourceLinks").className = "source-links empty";
+  document.getElementById("sourceLinks").textContent = "No sources yet.";
+  document.getElementById("scores").innerHTML = "";
+  document.getElementById("thoughts").innerHTML = "";
+}
+
+async function loadHistory() {
+  resetSourcePanel();
+  const container = document.getElementById("chatMessages");
+  container.innerHTML = welcomeHtml;
+  try {
+    const res = await fetch(`/history/${SESSION_ID}`);
+    const data = await res.json();
+    const messages = data.messages || [];
+    if (messages.length) container.innerHTML = "";
+    messages.forEach(m => addMessage(m.role, m.content, { agent: m.role === "assistant" ? "Assistant" : "" }));
+  } catch (_) {}
+}
+
+ensureConversation();
+renderConversationList();
 refreshFiles();
+loadHistory();
 </script>
 </body>
 </html>

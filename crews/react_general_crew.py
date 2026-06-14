@@ -31,6 +31,9 @@ import logging
 import urllib.parse
 import urllib.request
 
+import requests
+from bs4 import BeautifulSoup
+
 from tools.general_query_tools import (
     BuiltInFacts, CountryInfoTool, classify_question,
     extract_entity_after_of, normalize_query,
@@ -95,6 +98,79 @@ def _wiki_search(query: str, prefer: str = "") -> tuple[str, str]:
     extract  = re.sub(r"\s+", " ", summary.get("extract", "")).strip()
     page_url = summary.get("content_urls", {}).get("desktop", {}).get("page", "")
     return extract, page_url
+
+
+def _clean_web_text(html: str, max_chars: int = 1800) -> str:
+    soup = BeautifulSoup(html, "html.parser")
+    for tag in soup(["script", "style", "noscript", "header", "footer", "nav"]):
+        tag.decompose()
+
+    parts = []
+    for tag in soup.find_all(["p", "li"], limit=80):
+        text = re.sub(r"\s+", " ", tag.get_text(" ", strip=True)).strip()
+        if len(text) >= 40:
+            parts.append(text)
+        if sum(len(p) for p in parts) >= max_chars:
+            break
+    return " ".join(parts)[:max_chars].strip()
+
+
+def _web_search_duckduckgo(query: str, max_results: int = 3) -> list[dict]:
+    """
+    Google-like web fallback using DuckDuckGo HTML.
+    Returns readable page snippets from top result pages.
+    """
+    headers = {"User-Agent": _UA}
+    docs: list[dict] = []
+    try:
+        resp = requests.get(
+            "https://duckduckgo.com/html/",
+            params={"q": query},
+            headers=headers,
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        logger.debug("duckduckgo search failed for %s: %s", query, exc)
+        return []
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+    for result in soup.select(".result")[: max_results * 2]:
+        title_tag = result.select_one(".result__title a")
+        snippet_tag = result.select_one(".result__snippet")
+        if not title_tag:
+            continue
+
+        raw_url = title_tag.get("href", "")
+        parsed = urllib.parse.urlparse(raw_url)
+        query_params = urllib.parse.parse_qs(parsed.query)
+        url = query_params.get("uddg", [raw_url])[0]
+        if not url.startswith("http"):
+            continue
+
+        title = title_tag.get_text(" ", strip=True)
+        snippet = snippet_tag.get_text(" ", strip=True) if snippet_tag else ""
+        page_text = ""
+        try:
+            page_resp = requests.get(url, headers=headers, timeout=_TIMEOUT)
+            content_type = page_resp.headers.get("content-type", "")
+            if page_resp.ok and "text/html" in content_type:
+                page_text = _clean_web_text(page_resp.text)
+        except requests.RequestException as exc:
+            logger.debug("web page read failed for %s: %s", url, exc)
+
+        text = page_text or snippet
+        if not text:
+            continue
+        docs.append({
+            "title": title,
+            "url": url,
+            "text": text,
+            "source": "DuckDuckGo Web",
+        })
+        if len(docs) >= max_results:
+            break
+    return docs
 
 
 # ── Date / year extraction helpers ───────────────────────────────────────────
@@ -344,13 +420,29 @@ class SearchAgent:
         else:
             prefer = subject.split()[0] if subject else ""
         extract, page_url = _wiki_search(search_q, prefer=prefer)
+        if extract:
+            return {
+                "text":    extract,
+                "url":     page_url,
+                "source":  "Wikipedia",
+                "subject": subject,
+                "chars":   len(extract),
+                "docs":    [],
+            }
 
+        web_docs = _web_search_duckduckgo(search_q, max_results=3)
+        web_text = "\n\n".join(
+            f"{doc.get('title', '')}: {doc.get('text', '')}"
+            for doc in web_docs
+        ).strip()
+        first_url = web_docs[0].get("url", "") if web_docs else ""
         return {
-            "text":    extract,
-            "url":     page_url,
-            "source":  "Wikipedia",
+            "text":    web_text,
+            "url":     first_url,
+            "source":  "DuckDuckGo Web",
             "subject": subject,
-            "chars":   len(extract),
+            "chars":   len(web_text),
+            "docs":    web_docs,
         }
 
 
@@ -789,7 +881,14 @@ class ReActGeneralCrew:
         fact = self.facts.lookup(normalize_query(query))
         if fact:
             step("BuiltInFactAgent", "Thought: Matched built-in verified fact.")
-            return self._result(steps, fact, "built_in_facts")
+            verification = {
+                "verified": True,
+                "confidence": 1.0,
+                "reason": "Matched curated built-in fact.",
+                "corrected": fact,
+                "sources_used": 1,
+            }
+            return self._result(steps, fact, "built_in_facts", verification)
 
         # ── Country API shortcut for capital / population / currency ──────
         if q_type in ("capital", "population", "currency"):
@@ -805,7 +904,14 @@ class ReActGeneralCrew:
             if info:
                 answer = self._format_country(q_type, info)
                 step("FinalAnswerAgent", f"Answer: {answer[:160]}")
-                return self._result(steps, answer, "country_info_tool")
+                verification = {
+                    "verified": True,
+                    "confidence": 0.9,
+                    "reason": "Returned by CountryInfoTool.",
+                    "corrected": answer,
+                    "sources_used": 1,
+                }
+                return self._result(steps, answer, "country_info_tool", verification)
             step("SearchAgent",
                  f"Observation: CountryInfoTool returned nothing. Falling back to Wikipedia.")
 
@@ -818,11 +924,13 @@ class ReActGeneralCrew:
         search_result = self.search_agent.run(subject, q_type)
         text      = search_result["text"]
         page_url  = search_result["url"]
+        source    = search_result.get("source", "Wikipedia")
+        web_docs  = search_result.get("docs", [])
 
         step("ObservationAgent",
-             f"Observation: Wikipedia returned {search_result['chars']} chars. "
+             f"Observation: {source} returned {search_result['chars']} chars. "
              f"URL: {page_url[:80]}",
-             {"chars": search_result["chars"], "url": page_url})
+             {"chars": search_result["chars"], "url": page_url, "source": source, "docs": web_docs})
 
         if not text:
             # MCP fallback
@@ -873,7 +981,15 @@ class ReActGeneralCrew:
 
         step("FinalAnswerAgent", f"Answer: {final[:200]}", final[:200])
 
-        return self._result(steps, final, "wikipedia_react_crew")
+        verification = {
+            "verified": validation.get("valid", False),
+            "confidence": validation.get("confidence", 0.0),
+            "reason": validation.get("reason", ""),
+            "corrected": validation.get("corrected", final),
+            "sources_used": 1 if page_url else 0,
+        }
+        tool_used = "wikipedia_react_crew" if source == "Wikipedia" else "web_react_crew"
+        return self._result(steps, final, tool_used, verification)
 
     # ── Helpers ──────────────────────────────────────────────────────────
 
@@ -896,11 +1012,12 @@ class ReActGeneralCrew:
         return str(info)
 
     @staticmethod
-    def _result(steps: list, answer: str, tool: str) -> dict:
+    def _result(steps: list, answer: str, tool: str, verification: dict | None = None) -> dict:
         return {
             "crew_name":   "ReActGeneralCrew",
             "crew_steps":  steps,
             "answer":      answer,
             "tool_used":   tool,
             "all_results": [{"tool": tool, "result": answer}] if answer else [],
+            "verification": verification or {},
         }

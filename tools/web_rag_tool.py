@@ -1,11 +1,13 @@
 import re
 import requests
 from bs4 import BeautifulSoup
+from tools.similarity_ranker import SimilarityRanker
 
 
 class WebRAGTool:
     def __init__(self, timeout: int = 10):
         self.timeout = timeout
+        self._ranker = SimilarityRanker()
 
     def expand_query(self, query: str):
         q = query.lower()
@@ -28,7 +30,7 @@ class WebRAGTool:
         docs = []
         for q in self.expand_query(query):
             docs.extend(self.duckduckgo_search(q, top_k=top_k))
-        return self.rank_by_similarity(query, docs)[:top_k]
+        return self._ranker.rank(query, docs)[:top_k]
 
     def duckduckgo_search(self, query: str, top_k: int = 5):
         docs = []
@@ -52,23 +54,12 @@ class WebRAGTool:
                     "source": "DuckDuckGo",
                 })
         except Exception as e:
-            docs.append({"title": "Search error", "url": "", "text": str(e), "source": "error"})
+            return []
         return docs
 
     def rank_by_similarity(self, query: str, docs: list[dict]):
-        q_words = set(re.findall(r"[a-zA-Z0-9]+", query.lower()))
-        ranked = []
-        for doc in docs:
-            text = f"{doc.get('title', '')} {doc.get('text', '')}".lower()
-            d_words = set(re.findall(r"[a-zA-Z0-9]+", text))
-            score = len(q_words & d_words) / max(len(q_words), 1)
-            for term in ["capital", "population", "gdp", "invent", "discover", "telephone", "gravity", "chola", "dynasty"]:
-                if term in query.lower() and term in text:
-                    score += 0.25
-            doc["similarity_score"] = round(score, 3)
-            ranked.append(doc)
-        ranked.sort(key=lambda x: x["similarity_score"], reverse=True)
-        return ranked
+        """Delegate to SimilarityRanker for domain-aware, answer-type-boosted ranking."""
+        return self._ranker.rank(query, docs)
 
     def build_context(self, docs: list[dict]) -> str:
         return "\n\n".join(
