@@ -1,0 +1,56 @@
+[
+  {
+    "movie_id": 1,
+    "movie_name": "Mission Impossible: Final Reckoning",
+    "theater": "AMC Stonebriar 24",
+    "city": "Frisco",
+    "showtime": "5:00 PM",
+    "price": 16,
+    "available_seats": ["A1", "A2", "A3", "A4", "B1", "B2", "B3", "B4", "C1", "C2", "C3", "C4"]
+  },
+  {
+    "movie_id": 1,
+    "movie_name": "Mission Impossible: Final Reckoning",
+    "theater": "Cinemark Frisco Square",
+    "city": "Frisco",
+    "showtime": "8:30 PM",
+    "price": 16,
+    "available_seats": ["A1", "A2", "B1", "B2"]
+  },
+  {
+    "movie_id": 2,
+    "movie_name": "Superman",
+    "theater": "Regal Dallas",
+    "city": "Dallas",
+    "showtime": "6:00 PM",
+    "price": 18,
+    "available_seats": ["A1", "A2", "A3", "B1", "B2", "B3"]
+  },
+  {
+    "movie_id": 3,
+    "movie_name": "Jurassic World Rebirth",
+    "theater": "AMC Dallas",
+    "city": "Dallas",
+    "showtime": "7:15 PM",
+    "price": 17,
+    "available_seats": ["A1", "A2", "A3", "A4", "B1", "B2"]
+  },
+  {
+    "movie_id": 4,
+    "movie_name": "F1 The Movie",
+    "theater": "Cinemark Plano",
+    "city": "Plano",
+    "showtime": "8:30 PM",
+    "price": 16,
+    "available_seats": ["A1", "A2", "B1", "B2"]
+  },
+  {
+    "movie_id": 5,
+    "movie_name": "How to Train Your Dragon",
+    "theater": "AMC Stonebriar 24",
+    "city": "Frisco",
+    "showtime": "1:45 PM",
+    "price": 14,
+    "available_seats": ["A1", "A2", "A3", "B1", "B2", "B3"]
+  }
+]

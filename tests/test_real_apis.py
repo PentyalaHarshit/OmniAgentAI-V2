@@ -23,6 +23,40 @@ def test_weather_tool_uses_open_meteo(monkeypatch):
     assert len(calls) == 2
 
 
+def test_weather_tool_extracts_city_without_matching_what():
+    assert WeatherTool()._extract_city("What is the weather in Dallas tomorrow?") == "Dallas"
+
+
+def test_weather_tool_returns_tomorrow_forecast(monkeypatch):
+    calls = []
+
+    def fake_get(url, as_text=False):
+        calls.append(url)
+        if "geocoding-api.open-meteo.com" in url:
+            return {"results": [{"latitude": 32.77, "longitude": -96.79, "name": "Dallas", "country": "United States"}]}
+        if "api.open-meteo.com" in url:
+            return {
+                "daily": {
+                    "time": ["2026-06-16", "2026-06-17"],
+                    "weathercode": [0, 1],
+                    "temperature_2m_max": [31, 33],
+                    "temperature_2m_min": [22, 24],
+                    "precipitation_probability_max": [5, 20],
+                    "wind_speed_10m_max": [12, 18],
+                }
+            }
+        return None
+
+    monkeypatch.setattr(mcp_live_tools, "_get", fake_get)
+
+    answer = WeatherTool().execute("What is the weather in Dallas tomorrow?")
+
+    assert "Tomorrow's Weather in Dallas, United States" in answer
+    assert "2026-06-17" in answer
+    assert "33" in answer
+    assert "forecast_days=2" in calls[-1]
+
+
 def test_news_tool_uses_google_news_rss(monkeypatch):
     monkeypatch.delenv("NEWSAPI_KEY", raising=False)
     rss = """

@@ -45,6 +45,18 @@ def test_router_applies_safety_layer_to_shopping_response():
     result = AgentRouter().run("Recommend a laptop for AI and machine learning under $1500")
 
     assert "---CHECKOUT_FORM---" not in result["answer"]
-    assert "Safety confirmation required" in result["answer"]
-    assert result["extra"]["safety_layer"]["requires_confirmation"] is True
-    assert "buy" in result["extra"]["safety_layer"]["blocked_auto_actions"]
+    assert "Preferred RAM?" in result["answer"]
+    assert result["extra"]["safety_layer"]["requires_confirmation"] is False
+    assert result["extra"]["safety_layer"]["blocked_auto_actions"] == []
+
+
+def test_safety_layer_allows_explicitly_confirmed_booking_action():
+    result = {
+        "answer": "Status: Confirmed\n\nBooking ID: TRIP-20260616-001\nE-ticket generated.",
+        "extra": {"confirmed_actions": ["book"]},
+    }
+
+    guarded = SafetyLayer().enforce(result, query="yes", route="travel")
+
+    assert "No booking or reservation has been confirmed" not in guarded["answer"]
+    assert guarded["extra"]["safety_layer"]["requires_confirmation"] is False

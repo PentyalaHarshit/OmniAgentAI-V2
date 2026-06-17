@@ -87,7 +87,7 @@ Never claim diagnosis, purchase, payment, booking, cancellation, or deployment i
         if any(k in q for k in ["health", "hospital", "doctor", "symptom", "chest pain", "diabetes", "fever", "breathing"]):
             return "Route to Healthcare Agent. Use healthcare RAG, risk scoring, XAI explanation, doctor lookup demo, and medical safety self-check. Do not diagnose."
 
-        if any(k in q for k in ["code", "c++", "python", "algorithm", "dijkstra", "leetcode", "codeforces"]):
+        if any(k in q for k in ["code", "c++", "python", "algorithm", "dijkstra", "leetcode"]):
             return "Route to Coding Agent. Use coding RAG, ToT algorithm selection, generation, compiler, tests, self-correction, and reviewer."
 
         if any(k in q for k in ["shop", "buy", "product", "laptop", "phone", "cart", "order"]):

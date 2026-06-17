@@ -5,6 +5,10 @@ from agents.healthcare_agent import HealthcareAgent
 from agents.research_agent import ResearchAgent
 from agents.resume_agent import ResumeAgent
 from agents.shopping_agent import ShoppingAgent
+from agents.finance_agent import FinanceAgent
+from agents.fitness_agent import FitnessAgent
+from agents.recipe_agent import RecipeAgent
+from agents.local_discovery_agent import LocalDiscoveryAgent
 from agents.travel_agent import TravelAgent
 from agents.flight_agent import FlightAgent
 from agents.hotel_agent import HotelAgent
@@ -50,6 +54,38 @@ DEPLOYMENT_KEYWORDS = [
     "self-host", "self host", "vps", "server setup",
 ]
 
+CODING_KEYWORDS = [
+    "code", "create", "implement", "solve", "program", "c++", "cpp", "python", "java", "algorithm",
+    "leetcode", "compile", "debug", "data structure",
+    "microservice", "api endpoint", "rest api", "graphql",
+    "fastapi", "flask", "django", "express", "spring boot",
+    "git", "github", "gitlab",
+    "sql", "database", "mongodb", "postgres", "redis",
+    "function", "class", "variable", "loop", "recursion",
+    "sorting", "linked list", "binary tree", "stack", "queue",
+    "script", "bash", "shell", "powershell",
+    "segment tree", "range sum", "range query", "range queries",
+    "range update", "fenwick", "binary indexed tree", "bit tree",
+    "heavy light decomposition", "heavy-light decomposition", "hld",
+    "lca", "binary lifting", "path maximum", "path query",
+    "dfs", "bfs", "dijkstra", "dynamic programming", "graph", "tree",
+    "shortest path", "priority queue", "heap", "trie", "kmp",
+    "disjoint set", "union find", "dsu",
+    "dp", "memoization", "tabulation", "competitive programming",
+    "cp algorithm",
+    "lowest common ancestor", "kth ancestor", "tree queries",
+    "tree query", "graph algorithm", "cpp17", "c++17",
+    "mo algorithm", "mo's algorithm", "centroid decomposition",
+    "dsu on tree", "small to large", "convex hull trick",
+    "li chao", "divide and conquer dp", "0-1 bfs", "zero one bfs",
+]
+
+STRONG_CODING_PATTERNS = [
+    r"\b(?:solve|implement|create|generate|write|debug|compile)\b.*\b(?:algorithm|cpp|c\+\+|python|java|graph|tree|dp|segment tree|lca|hld)\b",
+    r"\b(?:segment tree|fenwick|binary indexed tree|lca|lowest common ancestor|hld|heavy light decomposition)\b",
+    r"\b(?:dijkstra|bellman ford|0-1 bfs|zero one bfs|dfs|bfs|dsu|union find|dynamic programming|dp)\b",
+]
+
 
 class AgentRouter:
     name = "AgentRouter"
@@ -62,6 +98,10 @@ class AgentRouter:
         self.research_agent = ResearchAgent()
         self.resume_agent = ResumeAgent()
         self.shopping_agent = ShoppingAgent()
+        self.finance_agent = FinanceAgent()
+        self.fitness_agent = FitnessAgent()
+        self.recipe_agent = RecipeAgent()
+        self.local_discovery_agent = LocalDiscoveryAgent()
         self.travel_agent = TravelAgent()
         self.flight_agent = FlightAgent()
         self.calculator_agent = CalculatorAgent()
@@ -94,11 +134,29 @@ class AgentRouter:
         if self.is_deployment_query(q):
             return "deployment", self.deployment_agent
 
+        if self.is_strong_coding_query(q):
+            return "coding", self.coding_agent
+
         if any(k in q for k in [
             "health", "hospital", "doctor", "symptom", "pain", "diabetes",
             "chest pain", "medical", "fever", "breathing", "blood pressure",
         ]):
             return "healthcare", self.healthcare_agent
+
+        if self.is_research_query(q):
+            return "research", self.research_agent
+
+        if self.is_finance_query(q):
+            return "finance", self.finance_agent
+
+        if any(k in q for k in ["workout", "fitness", "muscle gain", "exercise plan", "gym plan"]):
+            return "fitness", self.fitness_agent
+
+        if any(k in q for k in ["recipe", "meal", "meals", "high-protein", "high protein", "vegetarian"]):
+            return "recipe", self.recipe_agent
+
+        if any(k in q for k in ["tourist attractions", "top tourist", "top places", "attractions in", "places to visit"]):
+            return "local_discovery", self.local_discovery_agent
 
         shopping_intent_phrases = [
             "i want to buy", "buy", "purchase", "shopping", "recommend",
@@ -116,6 +174,8 @@ class AgentRouter:
         # wins even when the user mentions an app, script, API, or code.
         if any(k in q for k in ["payment", "pay", "card", "checkout", "wallet"]):
             return "payment", self.payment_agent
+        if any(k in q for k in ["cab", "taxi", "uber", "lyft", "ride"]):
+            return "cab", self.cab_agent
         if any(k in q for k in ["flight", "plane", "airport", "airline"]):
             return "flight", self.flight_agent
         if any(k in q for k in ["hotel", "room", "stay", "check-in", "checkout", "resort"]):
@@ -128,11 +188,9 @@ class AgentRouter:
             return "train", self.train_agent
         if any(k in q for k in ["bus", "coach"]):
             return "bus", self.bus_agent
-        if any(k in q for k in ["cab", "taxi", "uber", "lyft", "ride"]):
-            return "cab", self.cab_agent
         if any(k in q for k in ["event", "concert", "game", "festival", "conference"]):
             return "event", self.event_agent
-        if any(k in q for k in ["vacation", "package", "trip package", "holiday"]):
+        if any(k in q for k in ["vacation", "package", "trip package", "holiday", "plan a 5-day vacation"]):
             return "vacation_package", self.vacation_package_agent
         if any(k in q for k in ["travel", "trip", "itinerary", "tour", "destination"]):
             return "travel", self.travel_agent
@@ -156,17 +214,7 @@ class AgentRouter:
                 return "country", self.country_agent
             return "general", self.general_agent
 
-        if any(k in q for k in [
-            "code", "program", "c++", "cpp", "python", "java", "algorithm",
-            "leetcode", "codeforces", "dijkstra", "compile", "debug",
-            "microservice", "api endpoint", "rest api", "graphql",
-            "fastapi", "flask", "django", "express", "spring boot",
-            "git", "github", "gitlab",
-            "sql", "database", "mongodb", "postgres", "redis",
-            "function", "class", "variable", "loop", "recursion",
-            "sorting", "linked list", "binary tree", "stack", "queue",
-            "script", "bash", "shell", "powershell",
-        ]):
+        if has_any_phrase(q, CODING_KEYWORDS):
             return "coding", self.coding_agent
 
         if any(k in q for k in ["research", "paper", "literature", "survey", "research gap", "methodology"]):
@@ -211,6 +259,31 @@ class AgentRouter:
     def is_deployment_query(self, q: str) -> bool:
         """Return True if the query is about deploying/containerising an application."""
         return any(kw in q for kw in DEPLOYMENT_KEYWORDS)
+
+    def is_research_query(self, q: str) -> bool:
+        phrases = [
+            "research", "paper", "literature review", "research gap",
+            "gap analysis", "research roadmap", "possible experiments",
+            "evaluation metrics", "attention is all you need",
+            "gpt-4 technical report", "latest ai news", "open-source ai",
+            "open source ai", "multimodal ai", "compare gpt", "compare models",
+            "claude", "gemini", "deepseek", "qwen", "benchmark",
+            "can ai invent", "invent new algorithms", "self-improving agentic rag",
+        ]
+        return any(phrase in q for phrase in phrases)
+
+    def is_finance_query(self, q: str) -> bool:
+        phrases = [
+            "monthly expenses", "expense", "expenses", "budget", "income",
+            "earn $", "spend $", "save $", "savings", "loan", "student loan",
+            "federal tax", "tax", "etf", "s&p 500", "nasdaq", "stock",
+            "analyze aapl", "crypto", "bitcoin", "ethereum", "investment",
+            "financial report",
+        ]
+        return any(phrase in q for phrase in phrases)
+
+    def is_strong_coding_query(self, q: str) -> bool:
+        return any(re.search(pattern, q, re.I) for pattern in STRONG_CODING_PATTERNS)
 
     def is_general_factual_question(self, q: str) -> bool:
         """Return True for fact-seeking questions that may mention coding terms."""

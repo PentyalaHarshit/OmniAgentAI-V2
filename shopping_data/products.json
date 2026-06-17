@@ -1,0 +1,62 @@
+[
+  {
+    "product_id": "LAP-001",
+    "category": "laptop",
+    "name": "Lenovo Legion 5",
+    "price": 1199,
+    "ram": "32GB",
+    "storage": "1TB SSD",
+    "gpu": "RTX 4060",
+    "brand": "Lenovo",
+    "use_cases": ["AI/ML", "Gaming", "Programming"],
+    "reason": "Best GPU performance for AI workloads under $1200."
+  },
+  {
+    "product_id": "LAP-002",
+    "category": "laptop",
+    "name": "ASUS TUF A15",
+    "price": 1149,
+    "ram": "32GB",
+    "storage": "1TB SSD",
+    "gpu": "RTX 4050",
+    "brand": "ASUS",
+    "use_cases": ["AI/ML", "Gaming", "Programming"],
+    "reason": "Strong price-to-performance with enough RAM for local ML work."
+  },
+  {
+    "product_id": "LAP-003",
+    "category": "laptop",
+    "name": "Acer Predator Helios Neo",
+    "price": 1189,
+    "ram": "32GB",
+    "storage": "1TB SSD",
+    "gpu": "RTX 4060",
+    "brand": "Acer",
+    "use_cases": ["AI/ML", "Gaming"],
+    "reason": "RTX 4060 and 32GB RAM make it a strong AI development option."
+  },
+  {
+    "product_id": "LAP-004",
+    "category": "laptop",
+    "name": "Dell XPS 13",
+    "price": 999,
+    "ram": "16GB",
+    "storage": "512GB SSD",
+    "gpu": "Integrated",
+    "brand": "Dell",
+    "use_cases": ["Programming", "Office Work"],
+    "reason": "Portable programming laptop, but not ideal for GPU-heavy AI work."
+  },
+  {
+    "product_id": "PHONE-001",
+    "category": "phone",
+    "name": "Samsung Galaxy S25",
+    "price": 799,
+    "ram": "12GB",
+    "storage": "256GB",
+    "gpu": "Mobile GPU",
+    "brand": "Samsung",
+    "use_cases": ["Camera", "General"],
+    "reason": "Latest Samsung option under $800 with strong camera features."
+  }
+]

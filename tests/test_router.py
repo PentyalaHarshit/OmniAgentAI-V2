@@ -15,6 +15,30 @@ def test_coding_route():
     route, agent = r.route("write a python function to sort a list")
     assert route == "coding"
 
+    route, agent = r.route("Create Segment Tree with range sum queries")
+    assert route == "coding"
+
+    route, agent = r.route("Fenwick tree for point updates and range queries")
+    assert route == "coding"
+
+    route, agent = r.route("Create Heavy Light Decomposition")
+    assert route == "coding"
+
+    route, agent = r.route("Create Heavy Light Decomposition in C++.")
+    assert route == "coding"
+
+    route, agent = r.route("Create Lowest Common Ancestor using Binary Lifting in C++.")
+    assert route == "coding"
+
+    for query in [
+        "Implement graph DP in cpp",
+        "HLD tree path query C++17",
+        "Segment tree range max point update",
+        "Create centroid decomposition for tree distance queries",
+    ]:
+        route, agent = r.route(query)
+        assert route == "coding"
+
 
 def test_shopping_route():
     r = AgentRouter()
@@ -29,9 +53,9 @@ def test_router_precision_general_vs_shopping():
     route, agent = r.route("Who invented the telephone?")
     assert route == "general"
 
-    # What is the capital of France? -> GeneralAgent
+    # What is the capital of France? -> CountryAgent
     route, agent = r.route("What is the capital of France?")
-    assert route == "general"
+    assert route == "country"
 
     # What is machine learning? -> GeneralAgent
     route, agent = r.route("What is machine learning?")

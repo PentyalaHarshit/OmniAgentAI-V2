@@ -80,13 +80,19 @@ async def ask(request: Request):
         # Also break out if the new query routes to a DIFFERENT agent than the active one
         prev_state = conversation_state.get(session_id)
         active_agent_name = prev_state.get("active_agent", "") if prev_state else ""
+        active_flow = prev_state.get("flow") or "" if prev_state else ""
+        is_healthcare_flow = active_flow.startswith("healthcare_")
+        is_trip_flow = active_flow.startswith("trip_")
+        is_movie_flow = active_flow.startswith("movie_")
+        is_shopping_flow = active_flow.startswith("shopping_")
         new_route, _ = router.route(q)
         # Map route name to agent name for comparison
         ROUTE_TO_AGENT = {
             "coding": "CodingAgent", "deployment": "DeploymentAgent",
             "healthcare": "HealthcareAgent",
             "research": "ResearchAgent", "resume": "ResumeAgent",
-            "shopping": "ShoppingAgent", "travel": "TravelAgent",
+            "shopping": "ShoppingAgent", "finance": "FinanceAgent", "travel": "TravelAgent",
+            "fitness": "FitnessAgent", "recipe": "RecipeAgent", "local_discovery": "LocalDiscoveryAgent",
             "flight": "FlightAgent", "hotel": "HotelAgent",
             "movie": "MovieAgent", "restaurant": "RestaurantAgent",
             "train": "TrainAgent", "bus": "BusAgent", "cab": "CabAgent",
@@ -97,16 +103,35 @@ async def ask(request: Request):
             "general": "GeneralAgent", "calculator": "CalculatorAgent",
         }
         new_agent_name = ROUTE_TO_AGENT.get(new_route, "")
-        is_new_domain = bool(active_agent_name and new_agent_name and new_agent_name != active_agent_name)
+        is_stateful_flow = is_healthcare_flow or is_trip_flow or is_movie_flow or is_shopping_flow
+        stateful_breakout_routes = {
+            "coding", "deployment", "healthcare", "research", "resume",
+            "shopping", "travel", "flight", "hotel", "movie", "restaurant",
+            "train", "bus", "cab", "event", "vacation_package", "payment",
+            "finance",
+            "coupon", "review", "cancellation", "notification", "support",
+            "calculator",
+        }
+        is_new_domain = bool(
+            active_agent_name
+            and new_agent_name
+            and new_agent_name != active_agent_name
+            and (not is_stateful_flow or new_route in stateful_breakout_routes)
+        )
 
-        if any(s in q for s in GENERAL_STARTERS) or is_new_domain:
+        if (any(s in q for s in GENERAL_STARTERS) and not is_stateful_flow) or is_new_domain:
             # New question from a different domain — clear slot-filling state and fall through
             conversation_state.clear(session_id)
         else:
             # Continue the existing slot-filling conversation
-            prev_state = conversation_state.update_from_user_reply(session_id, query)
-            active_agent = prev_state.get("active_agent")
-            fields = prev_state.get("fields", {})
+            if is_healthcare_flow or is_trip_flow or is_movie_flow or is_shopping_flow:
+                prev_state = conversation_state.get(session_id)
+                active_agent = prev_state.get("active_agent")
+                fields = {}
+            else:
+                prev_state = conversation_state.update_from_user_reply(session_id, query)
+                active_agent = prev_state.get("active_agent")
+                fields = prev_state.get("fields", {})
 
             agent_result = router.run_with_agent_name(
                 active_agent,

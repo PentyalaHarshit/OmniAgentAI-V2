@@ -52,6 +52,26 @@ class ConversationState:
         if not state:
             return state
 
+        if state.get("flow") == "healthcare_triage":
+            questions = state.get("required_questions", [])
+            index = int(state.get("current_question_index", 0) or 0)
+            answers = state.get("answers", {})
+            fields = state.get("fields", {})
+
+            if index < len(questions):
+                key = questions[index][0]
+                cleaned = self.clean_reply(user_reply)
+                answers[key] = cleaned
+                fields[key] = cleaned
+                state["current_question_index"] = index + 1
+
+            next_index = int(state.get("current_question_index", 0) or 0)
+            state["answers"] = answers
+            state["fields"] = fields
+            state["missing_fields"] = [key for key, _ in questions[next_index:]]
+            self.set(session_id, state)
+            return state
+
         missing = state.get("missing_fields", [])
         fields = state.get("fields", {})
 

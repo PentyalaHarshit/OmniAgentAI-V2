@@ -17,6 +17,7 @@ Flow
 """
 
 from agents.base_agent import BaseAgent
+import re
 
 
 class HotelAgent(BaseAgent):
@@ -33,6 +34,55 @@ class HotelAgent(BaseAgent):
         "Safety check — no booking without confirmation",
         "Return top hotels and ask user to confirm",
     ]
+
+    def run(self, query: str, prefilled_fields: dict | None = None, session_id: str = "default"):
+        city = self.extract_city(query) or "New York"
+        budget = self.extract_budget(query) or 200
+        hotels = [
+            {"name": "Marriott Times Square", "price": 180},
+            {"name": "Hilton Midtown", "price": 190},
+            {"name": "Hyatt Manhattan", "price": 175},
+        ]
+        filtered = [hotel for hotel in hotels if hotel["price"] <= budget] or hotels
+        recommended = filtered[0]
+        answer = "\n".join([
+            "HotelBookingAgent / hotel",
+            "",
+            "Top Hotels",
+            "",
+            *[
+                f"{index}. {hotel['name']}\n   ${hotel['price']}/night"
+                for index, hotel in enumerate(filtered, start=1)
+            ],
+            "",
+            "Recommended:",
+            recommended["name"],
+            "",
+            "Book now?",
+            "yes/no",
+        ])
+        return self.response(query, [
+            "Hotel Search API: searched local demo hotel inventory.",
+            "Recommendation Agent: selected the best hotel under budget.",
+            "Booking Agent: waiting for explicit booking confirmation.",
+        ], answer, {
+            "selected_booking_agent": "HotelBookingAgent",
+            "city": city,
+            "budget_per_night": budget,
+            "hotels": filtered,
+            "recommendation": recommended,
+            "safety_layer_skip_actions": ["book", "pay"],
+        })
+
+    @staticmethod
+    def extract_city(query: str):
+        match = re.search(r"\bin\s+([A-Za-z ]+?)(?:\s+for|\s+under|\.|$)", query, re.I)
+        return match.group(1).strip().title() if match else ""
+
+    @staticmethod
+    def extract_budget(query: str):
+        match = re.search(r"under\s+\$?\s*(\d+)", query, re.I)
+        return int(match.group(1)) if match else 0
 
     def build_answer(self, extracted: dict, crew_result: dict) -> str:
         availability = crew_result.get("availability", {})

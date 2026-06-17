@@ -59,7 +59,14 @@ class SafetyLayer:
 
     def enforce(self, result: dict, query: str = "", route: str = "") -> dict:
         answer = result.get("answer", "") or ""
+        extra = result.setdefault("extra", {})
         detected = self.detect_actions(query, route, answer)
+        skip_actions = set(extra.get("safety_layer_skip_actions", []))
+        confirmed_actions = set(extra.get("confirmed_actions", []))
+        detected = [
+            action for action in detected
+            if action not in skip_actions and action not in confirmed_actions
+        ]
 
         sanitized = self.CHECKOUT_BLOCK_RE.sub("", answer).strip()
         for pattern, replacement in self.UNSAFE_REPLACEMENTS:
@@ -69,7 +76,6 @@ class SafetyLayer:
             sanitized = self.append_confirmation_notice(sanitized, detected)
 
         result["answer"] = sanitized
-        extra = result.setdefault("extra", {})
         extra["safety_layer"] = {
             "checked": True,
             "requires_confirmation": bool(detected),
@@ -99,7 +105,7 @@ class SafetyLayer:
             "vacation_package": ["book", "pay"],
             "travel": ["book"],
             "cancellation": ["cancel"],
-            "healthcare": ["diagnose", "book"],
+            "healthcare": ["diagnose"],
         }
         for action in route_map.get(route, []):
             if action not in detected:

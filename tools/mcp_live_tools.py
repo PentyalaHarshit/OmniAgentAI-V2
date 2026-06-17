@@ -78,11 +78,21 @@ class WeatherTool:
         r"\b(weather|temperature|temp|rain|snow|sunny|cloudy|forecast|humidity|wind|hot|cold|climate)\b",
         re.I
     )
-    # Extract city name from query
-    CITY_RE = re.compile(
-        r"(?:weather\s+(?:in|at|for|of)?|in|at|for)\s+([A-Za-z\s,]+?)(?:\?|$|\s+today|\s+now|\s+tomorrow)",
-        re.I
-    )
+    # Extract city name from query. Word boundaries avoid matching "at" in
+    # words such as "What", which used to capture "is the weather in Dallas".
+    CITY_PATTERNS = [
+        re.compile(
+            r"\b(?:weather|temperature|forecast|rain|snow|humidity|wind)\s+"
+            r"(?:in|at|for|of)\s+([A-Za-z][A-Za-z\s,.'-]*?)"
+            r"(?:\?|$|\s+(?:today|now|tomorrow|tonight|this\s+week|next\s+week))",
+            re.I,
+        ),
+        re.compile(
+            r"\b(?:in|at|for)\s+([A-Za-z][A-Za-z\s,.'-]*?)"
+            r"(?:\?|$|\s+(?:today|now|tomorrow|tonight|this\s+week|next\s+week))",
+            re.I,
+        ),
+    ]
 
     def _geocode(self, city: str) -> tuple[float, float, str] | None:
         url = ("https://geocoding-api.open-meteo.com/v1/search?"
@@ -93,21 +103,23 @@ class WeatherTool:
         r = data["results"][0]
         return r["latitude"], r["longitude"], r.get("name", city) + ", " + r.get("country", "")
 
+    def _extract_city(self, query: str) -> str:
+        for pattern in self.CITY_PATTERNS:
+            match = pattern.search(query)
+            if match:
+                city = match.group(1).strip().strip(",")
+                city = re.sub(r"\s+", " ", city)
+                return city
+
+        # Fallback: grab the last capitalised word sequence.
+        words = re.findall(r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*", query)
+        return words[-1] if words else ""
+
     def execute(self, query: str) -> str:
         if not self.TRIGGERS.search(query):
             return ""
 
-        # Extract city
-        city = ""
-        m = self.CITY_RE.search(query)
-        if m:
-            city = m.group(1).strip().rstrip(",")
-
-        if not city:
-            # Fallback: grab the last capitalised word sequence
-            words = re.findall(r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*", query)
-            city = words[-1] if words else ""
-
+        city = self._extract_city(query)
         if not city:
             return ""
 
@@ -116,18 +128,48 @@ class WeatherTool:
             return f"⚠️ Could not find location: **{city}**"
 
         lat, lon, label = geo
+        wants_tomorrow = bool(re.search(r"\btomorrow\b", query, re.I))
+        forecast_params = {
+            "latitude": lat,
+            "longitude": lon,
+            "current": "temperature_2m,relative_humidity_2m,wind_speed_10m,weathercode",
+            "wind_speed_unit": "kmh",
+            "timezone": "auto",
+        }
+        if wants_tomorrow:
+            forecast_params.update({
+                "daily": "weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max",
+                "forecast_days": 2,
+            })
+
         url = (
             "https://api.open-meteo.com/v1/forecast?"
-            + urllib.parse.urlencode({
-                "latitude": lat,
-                "longitude": lon,
-                "current": "temperature_2m,relative_humidity_2m,wind_speed_10m,weathercode",
-                "wind_speed_unit": "kmh",
-                "timezone": "auto",
-            })
+            + urllib.parse.urlencode(forecast_params)
         )
         data = _get(url)
-        if not data or "current" not in data:
+        if not data:
+            return ""
+
+        if wants_tomorrow and data.get("daily"):
+            daily = data["daily"]
+            if len(daily.get("time", [])) > 1:
+                code = daily.get("weathercode", [0, 0])[1]
+                condition = WMO_CODES.get(code, "Unknown")
+                high = daily.get("temperature_2m_max", ["N/A", "N/A"])[1]
+                low = daily.get("temperature_2m_min", ["N/A", "N/A"])[1]
+                rain = daily.get("precipitation_probability_max", ["N/A", "N/A"])[1]
+                wind = daily.get("wind_speed_10m_max", ["N/A", "N/A"])[1]
+                date = daily.get("time", ["", "tomorrow"])[1]
+                return (
+                    f"🌤️ **Tomorrow's Weather in {label}** ({date})\n\n"
+                    f"- **Condition**: {condition}\n"
+                    f"- **High / Low**: {high}°C / {low}°C\n"
+                    f"- **Rain Chance**: {rain}%\n"
+                    f"- **Max Wind Speed**: {wind} km/h\n\n"
+                    f"*Source: [Open-Meteo](https://open-meteo.com) (forecast)*"
+                )
+
+        if "current" not in data:
             return ""
 
         c = data["current"]

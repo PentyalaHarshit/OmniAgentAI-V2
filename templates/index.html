@@ -248,7 +248,20 @@ function renderMarkdown(text) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 
-  s = s.replace(/```([\s\S]*?)```/g, "<pre><code>$1</code></pre>");
+  const codeBlocks = [];
+  s = s.replace(/```([A-Za-z0-9_+-]*)\s*\n?([\s\S]*?)```/g, (_, lang, code) => {
+    const language = (lang || "code").trim();
+    const token = `@@CODE_BLOCK_${codeBlocks.length}@@`;
+    codeBlocks.push(`
+      <div class="code-editor">
+        <div class="code-toolbar">
+          <span class="code-language">${escapeHtml(language)}</span>
+          <button class="code-copy-btn" type="button" title="Copy code" aria-label="Copy code" onclick="copyCodeBlock(this)">Copy</button>
+        </div>
+        <pre><code>${code.trim()}</code></pre>
+      </div>`);
+    return token;
+  });
   s = s.replace(/`([^`]+)`/g, "<code style='background:#1e2236;padding:2px 5px;border-radius:4px'>$1</code>");
   s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
@@ -256,7 +269,42 @@ function renderMarkdown(text) {
   s = s.replace(/(^|\n)[•\-] (.+)/g, "$1<li>$2</li>");
   s = s.replace(/(<li>.*<\/li>)/gs, "<ul>$1</ul>");
   s = s.replace(/\n/g, "<br>");
+  codeBlocks.forEach((html, index) => {
+    s = s.replace(`@@CODE_BLOCK_${index}@@`, html);
+  });
   return s + infoCardHtml + checkoutHtml;
+}
+
+async function copyCodeBlock(button) {
+  const editor = button.closest(".code-editor");
+  const code = editor?.querySelector("pre code")?.innerText || "";
+  if (!code) return;
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(code);
+    } else {
+      const textarea = document.createElement("textarea");
+      textarea.value = code;
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+    const original = button.textContent;
+    button.textContent = "Copied";
+    button.classList.add("copied");
+    setTimeout(() => {
+      button.textContent = original;
+      button.classList.remove("copied");
+    }, 1200);
+  } catch (_) {
+    button.textContent = "Failed";
+    setTimeout(() => { button.textContent = "Copy"; }, 1200);
+  }
 }
 
 function parseBlock(block) {

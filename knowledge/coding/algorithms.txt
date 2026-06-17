@@ -1,7 +1,7 @@
 # Advanced Algorithms Knowledge Base for OmniAgentAI Coding Agent
 
 Use this file as RAG knowledge for:
-- Codeforces
+- Competitive programming
 - LeetCode
 - Competitive programming
 - Algorithm selection
@@ -145,6 +145,20 @@ Preprocessing:
 Query:
 - O(log N)
 
+Algorithm: lowest_common_ancestor_binary_lifting
+Keywords: lca, lowest common ancestor, binary lifting, tree ancestor, kth parent
+Category: tree
+Time Complexity: O(N log N) preprocessing, O(log N) per query
+Memory Complexity: O(N log N)
+Use When: Need to answer LCA queries in a tree efficiently.
+Approach:
+1. Run DFS from root.
+2. Store depth of each node.
+3. Store up[node][j] = 2^j-th ancestor.
+4. Lift deeper node to same depth.
+5. Lift both nodes together until parents match.
+6. Return parent.
+
 Euler Tour
 Use when:
 - Convert subtree queries into range queries
@@ -169,7 +183,7 @@ Use when:
 Complexity:
 - O(N log N)
 Common in:
-- Codeforces tree problems
+- Advanced tree problems
 
 Tree DP
 Use when:
@@ -786,10 +800,10 @@ T up to 1e4:
 - Total sum constraints matter
 
 ============================================================
-16. CODEFORCES STRATEGY
+16. COMPETITIVE PROGRAMMING STRATEGY
 ============================================================
 
-For Codeforces:
+For competitive programming:
 1. Read constraints first.
 2. Identify input size.
 3. Determine required complexity.

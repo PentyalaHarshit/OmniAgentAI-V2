@@ -2,6 +2,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+.env
+secrets/
+
 .pytest_cache/
 .coverage
 htmlcov/

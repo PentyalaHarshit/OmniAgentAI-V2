@@ -1,0 +1,16 @@
+Template: fast_cpp17
+Use When: Competitive programming and algorithmic C++17 solutions.
+Includes: bits/stdc++.h
+Setup: ios::sync_with_stdio(false); cin.tie(nullptr);
+
+Template: graph_bfs_dfs
+Use When: Connected components, tree traversal, graph validation.
+Core: vector<vector<int>> graph; vector<int> visited; queue<int> or recursive DFS.
+
+Template: binary_lifting
+Use When: LCA, kth ancestor, ancestor subtree queries.
+Core: depth array, up[node][j], DFS tin/tout when subtree checks are needed.
+
+Template: segment_tree
+Use When: Range query/update.
+Core: build, update, query with O(log N).

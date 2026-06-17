@@ -254,10 +254,15 @@ class GeneralAgent(BaseAgent):
                 "verification": verification,
             })
 
-        multi_reasoning_answer = self.answer_from_multi_reasoning(normalized_query)
-        if multi_reasoning_answer:
+        multi_reasoning_result = self.answer_from_multi_reasoning(normalized_query)
+        if multi_reasoning_result:
             thoughts.append("Action: MultiReasoning framework answered analysis-style query.")
-            verification = {
+            thoughts.extend([
+                f"[MultiReasoning] {t}"
+                for t in multi_reasoning_result.get("thoughts", [])
+            ])
+            multi_reasoning_answer = multi_reasoning_result.get("answer", "")
+            verification = multi_reasoning_result.get("verification") or {
                 "verified": True,
                 "confidence": 0.8,
                 "reason": "Answered with curated multi-reasoning framework for analysis-style query.",
@@ -267,6 +272,7 @@ class GeneralAgent(BaseAgent):
             return self.verified_response(original_query, thoughts, multi_reasoning_answer, {
                 "slot_filling": False,
                 "source_stage": "multi_reasoning",
+                "reasoning_path": multi_reasoning_result.get("reasoning_path", {}),
                 "verification": verification,
             })
 
@@ -585,25 +591,16 @@ class GeneralAgent(BaseAgent):
             return ""
         return guidance.strip()
 
-    def answer_from_multi_reasoning(self, query: str) -> str:
+    def answer_from_multi_reasoning(self, query: str) -> dict:
         if self.should_use_live_api(query):
-            return ""
+            return {}
         if not re.search(
             r"\b(compare|comparison|difference|pros and cons|tradeoffs?|why|how|explain|history|causes?|effects?)\b",
             query,
         ):
-            return ""
+            return {}
 
-        subject = re.sub(r"\s+", " ", query.strip(" ?."))
-        return (
-            f"Here is a multi-reasoning view for **{subject}**:\n\n"
-            "1. **Goal reasoning:** First decide what outcome matters most: accuracy, speed, cost, safety, usability, or long-term maintainability.\n"
-            "2. **Strength reasoning:** Identify where each option is strongest instead of asking for one universal winner.\n"
-            "3. **Risk reasoning:** Check what can go wrong, including outdated information, hidden assumptions, edge cases, and operational limits.\n"
-            "4. **Context reasoning:** Match the answer to your situation; the best choice can change depending on budget, data sensitivity, scale, and task difficulty.\n"
-            "5. **Decision reasoning:** Pick the option that satisfies the highest-priority constraints, then test it on a small real example before committing.\n\n"
-            "**Best practical answer:** use this as a decision framework, then ask a more specific follow-up if you want a direct recommendation for your exact use case."
-        )
+        return self.high_reasoner.run(query, enable_tools=False)
 
     def answer_from_knowledge_rag(self, query: str, thoughts: list[str]):
         if needs_live_verification(query):

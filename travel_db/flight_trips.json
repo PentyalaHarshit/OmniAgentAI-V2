@@ -1,0 +1,13 @@
+[
+  {
+    "trip_id": "FLT-001",
+    "from": "Dallas",
+    "to": "New York",
+    "date": "2026-07-10",
+    "departure_time": "08:00",
+    "arrival_time": "12:15",
+    "airline": "American Airlines",
+    "price": 220,
+    "available_seats": ["12A", "12B", "14C", "15D"]
+  }
+]

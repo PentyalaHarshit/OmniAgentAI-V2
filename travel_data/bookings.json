@@ -1,0 +1,32 @@
+[
+  {
+    "booking_id": "TRIP-20260617-001",
+    "status": "confirmed",
+    "passenger": "Harshit P.",
+    "trip": {
+      "trip_id": "FLT-001",
+      "type": "flight",
+      "provider": "American Airlines",
+      "from": "Dallas",
+      "to": "New York",
+      "date": "2026-07-10",
+      "departure_time": "08:00",
+      "arrival_time": "12:15",
+      "price": 220,
+      "available_seats": [
+        "12A",
+        "12B",
+        "14C",
+        "15D"
+      ],
+      "seats_available": 12,
+      "duration_minutes": 255
+    },
+    "seats": [
+      "12B",
+      "12A"
+    ],
+    "total_price": 440,
+    "created_at": "2026-06-17T08:51:36"
+  }
+]

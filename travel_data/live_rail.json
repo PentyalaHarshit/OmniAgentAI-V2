@@ -1,0 +1,20 @@
+[
+  {
+    "trip_id": "RAIL-001",
+    "type": "rail",
+    "provider": "Texas Express",
+    "from": "Dallas",
+    "to": "Austin",
+    "date": "2026-07-10",
+    "departure_time": "09:00",
+    "arrival_time": "12:30",
+    "price": 45,
+    "available_seats": [
+      "A1",
+      "A2",
+      "B1",
+      "B2"
+    ],
+    "seats_available": 30
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "trip_id": "FLT-001",
+    "type": "flight",
+    "provider": "American Airlines",
+    "from": "Dallas",
+    "to": "New York",
+    "date": "2026-07-10",
+    "departure_time": "08:00",
+    "arrival_time": "12:15",
+    "price": 220,
+    "available_seats": [
+      "12A",
+      "12B",
+      "14C",
+      "15D"
+    ],
+    "seats_available": 12
+  },
+  {
+    "trip_id": "FLT-002",
+    "type": "flight",
+    "provider": "Delta Airlines",
+    "from": "Dallas",
+    "to": "New York",
+    "date": "2026-07-10",
+    "departure_time": "14:30",
+    "arrival_time": "18:45",
+    "price": 245,
+    "available_seats": [
+      "16A",
+      "16B",
+      "18C",
+      "18D"
+    ],
+    "seats_available": 8
+  }
+]

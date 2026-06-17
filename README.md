@@ -35,6 +35,8 @@ SERPAPI_API_KEY=your_serpapi_key
 NEWSAPI_KEY=optional_future_newsapi_key
 ```
 
+Never commit `.env`.
+
 Safety remains unchanged: real APIs can retrieve options and live data, but OmniAgentAI must not buy, pay, book, cancel, or diagnose without explicit user confirmation.
 
 ## Run
