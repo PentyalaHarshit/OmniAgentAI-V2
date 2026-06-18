@@ -47,6 +47,28 @@ PLATFORM_KEYWORDS = {
 }
 
 
+def detect_services(query: str):
+    q = query.lower()
+    services = ["fastapi-app"]
+
+    if "ollama" in q:
+        services.append("ollama")
+
+    if "chromadb" in q or "chroma" in q:
+        services.append("chromadb")
+
+    if "mysql" in q:
+        services.append("mysql")
+
+    if "postgres" in q or "postgresql" in q:
+        services.append("postgres")
+
+    if "redis" in q:
+        services.append("redis")
+
+    return services
+
+
 def detect_stack(query: str) -> dict:
     q = query.lower()
     fw_info = {"name": "fastapi", "lang": "python", "server": "uvicorn", "port": 8000, "install": "pip"}
@@ -68,7 +90,19 @@ def detect_stack(query: str) -> dict:
     app_name = app_name.group(1) if app_name else fw_info["name"] + "-app"
     app_name = app_name.replace(" ", "-").lower()
 
-    return {"framework": fw_info, "platform": platform, "app_name": app_name}
+    # Use detect_services to determine services - only add PostgreSQL/Redis if explicitly requested
+    services = detect_services(query)
+    database = "postgres" if "postgres" in services else ("mysql" if "mysql" in services else None)
+
+    return {"framework": fw_info, "platform": platform, "app_name": app_name, "database": database, "services": services}
+
+
+def is_crud_app_request(query: str) -> bool:
+    q = query.lower()
+    return (
+        any(term in q for term in ("crud", "rest api", "api application", "web application"))
+        and any(term in q for term in ("fastapi", "flask", "django", "express", "spring boot"))
+    )
 
 
 # ── File generators ────────────────────────────────────────────────────────
@@ -175,13 +209,42 @@ CMD ["/app/start.sh"]
 """
 
 
-def gen_compose(fw: dict, app_name: str) -> str:
+def gen_compose(fw: dict, app_name: str, database: str = "postgres") -> str:
     port = fw["port"]
     lang = fw["lang"]
     db_service = ""
     db_env = ""
     if lang == "python":
-        db_service = """
+        if database == "mysql":
+            db_service = """
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_USER: ${DB_USER:-user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-password}
+      MYSQL_DATABASE: ${DB_NAME:-appdb}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root-password}
+    command: --default-authentication-plugin=mysql_native_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data"""
+            db_env = """
+      - DB_URL=mysql+pymysql://${DB_USER:-user}:${DB_PASSWORD:-password}@db:3306/${DB_NAME:-appdb}
+      - REDIS_URL=redis://redis:6379"""
+        else:
+            db_service = """
   db:
     image: postgres:15-alpine
     restart: unless-stopped
@@ -203,15 +266,16 @@ def gen_compose(fw: dict, app_name: str) -> str:
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data"""
-        db_env = """
+            db_env = """
       - DB_URL=postgresql://${DB_USER:-user}:${DB_PASSWORD:-password}@db:5432/${DB_NAME:-appdb}
       - REDIS_URL=redis://redis:6379"""
 
     volumes = ""
     if db_service:
-        volumes = """
+        volume_name = "mysql_data" if database == "mysql" else "postgres_data"
+        volumes = f"""
 volumes:
-  postgres_data:
+  {volume_name}:
   redis_data:"""
 
     return f"""# ── docker-compose.yml ────────────────────────────────────────────────
@@ -477,7 +541,7 @@ fi
 """
 
 
-def gen_env_example(fw: dict, app_name: str) -> str:
+def gen_env_example(fw: dict, app_name: str, database: str = "postgres") -> str:
     lang = fw["lang"]
     base = f"""# ── .env.example ──────────────────────────────────────────────────────
 # Copy to .env and fill in your values — never commit .env to git!
@@ -487,7 +551,23 @@ APP_PORT={fw['port']}
 SECRET_KEY=change-me-to-a-random-secret
 """
     if lang == "python":
-        base += """
+        if database == "mysql":
+            base += """
+# Database
+DB_USER=user
+DB_PASSWORD=password
+DB_ROOT_PASSWORD=root-password
+DB_NAME=appdb
+DB_URL=mysql+pymysql://user:password@db:3306/appdb
+
+# Redis
+REDIS_URL=redis://redis:6379
+
+# External APIs
+OPENAI_API_KEY=sk-...
+"""
+        else:
+            base += """
 # Database
 DB_USER=user
 DB_PASSWORD=password
@@ -509,6 +589,146 @@ DATABASE_URL=postgresql://user:password@localhost:5432/appdb
 JWT_SECRET=change-me
 """
     return base
+
+
+def gen_fastapi_crud_files(database: str = "postgres") -> dict:
+    db_url = (
+        "mysql+pymysql://user:password@localhost:3306/appdb"
+        if database == "mysql"
+        else "postgresql://user:password@localhost:5432/appdb"
+    )
+    return {
+        "requirements.txt": """fastapi==0.115.6
+uvicorn[standard]==0.34.0
+SQLAlchemy==2.0.36
+pydantic==2.10.4
+python-dotenv==1.0.1
+PyMySQL==1.1.1
+cryptography==44.0.0
+""",
+        "app/database.py": f"""import os
+
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
+load_dotenv()
+
+DATABASE_URL = os.getenv("DB_URL", "{db_url}")
+
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+""",
+        "app/models.py": """from sqlalchemy import Boolean, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.database import Base
+
+
+class Item(Base):
+    __tablename__ = "items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(120), index=True)
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+""",
+        "app/schemas.py": """from pydantic import BaseModel, ConfigDict
+
+
+class ItemBase(BaseModel):
+    name: str
+    description: str | None = None
+    is_active: bool = True
+
+
+class ItemCreate(ItemBase):
+    pass
+
+
+class ItemUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    is_active: bool | None = None
+
+
+class ItemRead(ItemBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+""",
+        "app/main.py": """from fastapi import Depends, FastAPI, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app import models, schemas
+from app.database import Base, engine, get_db
+
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="FastAPI CRUD with MySQL")
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+@app.post("/items", response_model=schemas.ItemRead, status_code=status.HTTP_201_CREATED)
+def create_item(payload: schemas.ItemCreate, db: Session = Depends(get_db)):
+    item = models.Item(**payload.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.get("/items", response_model=list[schemas.ItemRead])
+def list_items(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return db.query(models.Item).offset(skip).limit(limit).all()
+
+
+@app.get("/items/{item_id}", response_model=schemas.ItemRead)
+def get_item(item_id: int, db: Session = Depends(get_db)):
+    item = db.get(models.Item, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return item
+
+
+@app.put("/items/{item_id}", response_model=schemas.ItemRead)
+def update_item(item_id: int, payload: schemas.ItemUpdate, db: Session = Depends(get_db)):
+    item = db.get(models.Item, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    for key, value in payload.model_dump(exclude_unset=True).items():
+        setattr(item, key, value)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_item(item_id: int, db: Session = Depends(get_db)):
+    item = db.get(models.Item, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    db.delete(item)
+    db.commit()
+    return None
+""",
+    }
 
 
 def gen_run_instructions(fw: dict, app_name: str, platform: str) -> str:
@@ -631,9 +851,10 @@ class DeploymentCrew:
         fw = stack["framework"]
         platform = stack["platform"]
         app_name = stack["app_name"]
+        database = stack.get("database", "postgres")
         steps.append({
             "thought": f"StackDetectorAgent: framework={fw['name']}, lang={fw['lang']}, "
-                       f"platform={platform}, app={app_name}",
+                       f"platform={platform}, app={app_name}, database={database}",
             "output": stack
         })
 
@@ -642,7 +863,7 @@ class DeploymentCrew:
         steps.append({"thought": "DockerfileAgent: generate Dockerfile", "output": "generated"})
 
         # Agent 4: Compose (always include — most useful)
-        compose = gen_compose(fw, app_name)
+        compose = gen_compose(fw, app_name, database)
         steps.append({"thought": "ComposeAgent: generate docker-compose.yml", "output": "generated"})
 
         # Agent 5: K8s manifests (only if requested)
@@ -670,8 +891,13 @@ class DeploymentCrew:
             steps.append({"thought": "AWSAgent: generate EC2 user-data bootstrap script", "output": "generated"})
 
         # Agent 9: .env.example
-        env_example = gen_env_example(fw, app_name)
+        env_example = gen_env_example(fw, app_name, database)
         steps.append({"thought": "EnvAgent: generate .env.example", "output": "generated"})
+
+        source_files = {}
+        if fw["name"] == "fastapi" and is_crud_app_request(query):
+            source_files = gen_fastapi_crud_files(database)
+            steps.append({"thought": "AppScaffoldAgent: generate FastAPI CRUD source files", "output": "generated"})
 
         # Agent 10: Run instructions
         run_instructions = gen_run_instructions(fw, app_name, platform)
@@ -705,6 +931,7 @@ class DeploymentCrew:
                 "nginx.conf": nginx,
                 "aws_ec2_user_data": aws_ec2,
                 ".env.example": env_example,
+                **source_files,
             },
             "run_instructions": run_instructions,
             "reviewer": {"issues": issues or ["All files look good ✓"]},

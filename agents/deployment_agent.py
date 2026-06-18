@@ -76,6 +76,19 @@ class DeploymentAgent(BaseAgent):
         # .env.example
         parts.append(f"### 🔐 .env.example\n```bash\n{files['.env.example'].strip()}\n```\n")
 
+        source_files = [
+            ("requirements.txt", "text"),
+            ("app/database.py", "python"),
+            ("app/models.py", "python"),
+            ("app/schemas.py", "python"),
+            ("app/main.py", "python"),
+        ]
+        included_source = [(path, lang) for path, lang in source_files if files.get(path)]
+        if included_source:
+            parts.append("### Application Source\n")
+            for path, lang in included_source:
+                parts.append(f"#### {path}\n```{lang}\n{files[path].strip()}\n```\n")
+
         # Run instructions
         parts.append(f"### 🚀 Deploy Commands\n{crew_result['run_instructions']}\n")
 

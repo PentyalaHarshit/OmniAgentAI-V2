@@ -1,5 +1,6 @@
 import re
 from agents.coding_agent import CodingAgent
+from agents.coding_ai_router import CodingAIRouter, route_user_query
 from agents.deployment_agent import DeploymentAgent
 from agents.healthcare_agent import HealthcareAgent
 from agents.research_agent import ResearchAgent
@@ -28,6 +29,19 @@ from agents.notification_agent import NotificationAgent
 from agents.support_agent import SupportAgent
 from agents.general_agent import GeneralAgent
 from agents.country_agent import CountryAgent
+from agents.code_review_agent import CodeReviewAgent
+from agents.debug_agent import DebugAgent
+from agents.test_case_agent import TestCaseAgent
+from agents.algorithm_agent import AlgorithmAgent
+from agents.system_design_agent import SystemDesignAgent
+from agents.ml_agent import MLAgent
+from agents.data_science_agent import DataScienceAgent
+from agents.rag_agent import RAGAgent
+from agents.mlops_agent import MLOpsAgent
+from agents.ai_architect_agent import AIArchitectAgent
+from agents.self_correction_agent import SelfCorrectionAgent
+from agents.loan_agent import LoanAgent
+from agents.tensorflow_agent import TensorFlowAgent
 from tools.query_corrector import QueryCorrector
 from tools.safety_layer import SafetyLayer
 
@@ -64,6 +78,8 @@ CODING_KEYWORDS = [
     "function", "class", "variable", "loop", "recursion",
     "sorting", "linked list", "binary tree", "stack", "queue",
     "script", "bash", "shell", "powershell",
+    "web crawler", "crawler", "scraper", "multithreaded",
+    "threading", "requests", "beautifulsoup",
     "segment tree", "range sum", "range query", "range queries",
     "range update", "fenwick", "binary indexed tree", "bit tree",
     "heavy light decomposition", "heavy-light decomposition", "hld",
@@ -92,6 +108,7 @@ class AgentRouter:
 
     def __init__(self):
         self.query_corrector = QueryCorrector()
+        self.coding_ai_router = CodingAIRouter()
         self.coding_agent = CodingAgent()
         self.deployment_agent = DeploymentAgent()
         self.healthcare_agent = HealthcareAgent()
@@ -121,22 +138,50 @@ class AgentRouter:
         self.support_agent = SupportAgent()
         self.general_agent = GeneralAgent()
         self.country_agent = CountryAgent()
+        self.code_review_agent = CodeReviewAgent()
+        self.debug_agent = DebugAgent()
+        self.test_case_agent = TestCaseAgent()
+        self.algorithm_agent = AlgorithmAgent()
+        self.system_design_agent = SystemDesignAgent()
+        self.ml_agent = MLAgent()
+        self.data_science_agent = DataScienceAgent()
+        self.rag_agent = RAGAgent()
+        self.mlops_agent = MLOpsAgent()
+        self.ai_architect_agent = AIArchitectAgent()
+        self.self_correction_agent = SelfCorrectionAgent()
+        self.loan_agent = LoanAgent()
+        self.tensorflow_agent = TensorFlowAgent()
         self.safety_layer = SafetyLayer()
+        self.active_conversations = {}  # Store active conversation states by session_id
 
     def route(self, query: str):
         q = query.lower()
 
-        # Priority: Calculator -> Deployment -> Healthcare -> Shopping
-        # -> Booking/Travel -> Coding -> General.
+        # Priority: Calculator -> Loan -> Healthcare -> Shopping
+        # -> Booking/Travel -> Coding/AI -> General.
         if self.is_math_query(query):
             return "calculator", self.calculator_agent
 
-        if self.is_deployment_query(q):
-            return "deployment", self.deployment_agent
+        if self.is_loan_query(q):
+            return "loan", self.loan_agent
 
-        if self.is_strong_coding_query(q):
+        if self.is_tensorflow_query(q):
+            return "tensorflow", self.tensorflow_agent
+
+        # Use new CodingAIRouter for coding/AI routing
+        coding_route = self.coding_ai_router.route(q)
+        if coding_route == "deployment":
+            return "deployment", self.deployment_agent
+        elif coding_route == "code_review":
+            return "code_review", self.code_review_agent
+        elif coding_route == "software_engineering":
+            return "coding", self.coding_agent
+        elif coding_route == "ai_architect":
+            return "ai_architect", self.ai_architect_agent
+        elif coding_route == "coding":
             return "coding", self.coding_agent
 
+        # Other domain routing
         if any(k in q for k in [
             "health", "hospital", "doctor", "symptom", "pain", "diabetes",
             "chest pain", "medical", "fever", "breathing", "blood pressure",
@@ -170,8 +215,7 @@ class AgentRouter:
         if has_any_phrase(q, shopping_intent_phrases) and has_any_word(q, shopping_products):
             return "shopping", self.shopping_agent
 
-        # Booking and travel routes stay ahead of coding so transactional intent
-        # wins even when the user mentions an app, script, API, or code.
+        # Booking and travel routes
         if any(k in q for k in ["payment", "pay", "card", "checkout", "wallet"]):
             return "payment", self.payment_agent
         if any(k in q for k in ["cab", "taxi", "uber", "lyft", "ride"]):
@@ -213,9 +257,6 @@ class AgentRouter:
             if self._is_country_query(q):
                 return "country", self.country_agent
             return "general", self.general_agent
-
-        if has_any_phrase(q, CODING_KEYWORDS):
-            return "coding", self.coding_agent
 
         if any(k in q for k in ["research", "paper", "literature", "survey", "research gap", "methodology"]):
             return "research", self.research_agent
@@ -259,6 +300,21 @@ class AgentRouter:
     def is_deployment_query(self, q: str) -> bool:
         """Return True if the query is about deploying/containerising an application."""
         return any(kw in q for kw in DEPLOYMENT_KEYWORDS)
+
+    def is_app_code_query(self, q: str) -> bool:
+        """Return True for framework/database application code generation requests."""
+        build_terms = ["build", "create", "generate", "scaffold", "implement"]
+        app_terms = ["fastapi", "crud", "mysql", "sqlalchemy"]
+        return has_any_word(q, build_terms) and has_any_phrase(q, app_terms)
+
+    def has_positive_deployment_intent(self, q: str) -> bool:
+        """Return True when deployment/containerization is explicitly requested."""
+        if re.search(r"\b(do not|don't|without)\b[^.]*\b(docker|dockerfile|deploy|deployment|kubernetes|ci/cd)\b", q):
+            return False
+        return any(kw in q for kw in [
+            "deploy", "deployment", "dockerize", "containerize",
+            "docker compose", "docker-compose", "kubernetes", "k8s", "ci/cd",
+        ])
 
     def is_research_query(self, q: str) -> bool:
         phrases = [
@@ -311,6 +367,82 @@ class AgentRouter:
             q, re.I
         ))
 
+    def is_code_review_query(self, q: str) -> bool:
+        """Return True if the query is about code review."""
+        keywords = [
+            "review", "code review", "optimize", "optimization",
+            "security check", "code quality", "tle", "time limit exceeded",
+            "bottleneck",
+        ]
+        return any(kw in q for kw in keywords)
+
+    def is_debug_query(self, q: str) -> bool:
+        """Return True if the query is about debugging."""
+        keywords = ["debug", "fix", "error", "bug", "segmentation fault", "memory limit", "runtime error"]
+        return any(kw in q for kw in keywords)
+
+    def is_test_case_query(self, q: str) -> bool:
+        """Return True if the query is about test cases."""
+        keywords = ["test case", "edge case", "stress test", "generate test", "test cases"]
+        return any(kw in q for kw in keywords)
+
+    def is_algorithm_query(self, q: str) -> bool:
+        """Return True if the query is about algorithm selection."""
+        keywords = ["algorithm", "best algorithm", "solve range query", "pattern detection", "algorithm ranking"]
+        return any(kw in q for kw in keywords)
+
+    def is_system_design_query(self, q: str) -> bool:
+        """Return True if the query is about system design."""
+        keywords = ["design", "architecture", "youtube", "whatsapp", "system", "scalable"]
+        return any(kw in q for kw in keywords)
+
+    def is_ml_query(self, q: str) -> bool:
+        """Return True if the query is about machine learning."""
+        if re.search(r"^\s*(what is|what's|define|meaning of)\s+(machine learning|ml)\b", q):
+            return False
+        keywords = ["train", "model", "prediction", "classification", "regression", "machine learning", "ml"]
+        return any(kw in q for kw in keywords)
+
+    def is_data_science_query(self, q: str) -> bool:
+        """Return True if the query is about data science."""
+        keywords = ["data science", "eda", "analysis", "churn", "dataset", "visualization"]
+        return any(kw in q for kw in keywords)
+
+    def is_rag_query(self, q: str) -> bool:
+        """Return True if the query is about RAG systems."""
+        keywords = ["rag", "retrieval", "vector database", "embedding", "document retrieval"]
+        return any(kw in q for kw in keywords)
+
+    def is_mlops_query(self, q: str) -> bool:
+        """Return True if the query is about MLOps."""
+        keywords = ["mlops", "ml pipeline", "model deployment", "model registry", "monitoring"]
+        return any(kw in q for kw in keywords)
+
+    def is_ai_architect_query(self, q: str) -> bool:
+        """Return True if the query is about AI architecture."""
+        keywords = ["ai architect", "agentic system", "agentic rag", "agent architecture", "multi-agent", "autonomous"]
+        return any(kw in q for kw in keywords)
+
+    def is_self_correction_query(self, q: str) -> bool:
+        """Return True if the query is about self-correction."""
+        keywords = ["self-correct", "improve", "retry", "fix code", "correct"]
+        return any(kw in q for kw in keywords)
+
+    def is_loan_query(self, q: str) -> bool:
+        """Return True if the query is about loans."""
+        keywords = ["loan", "student loan", "pay off loan", "loan payoff", "debt payoff", "pay off debt", "loan balance", "interest rate", "monthly payment"]
+        return any(kw in q for kw in keywords)
+
+    def is_tensorflow_query(self, q: str) -> bool:
+        """Return True if the query is about TensorFlow/deep learning predictions."""
+        keywords = [
+            "predict", "classify", "detect", "forecast", "inference",
+            "tensorflow", "deep learning", "neural network", "cnn", "rnn", "lstm",
+            "image classification", "object detection", "sentiment analysis",
+            "time series", "churn prediction", "ml model", "model prediction"
+        ]
+        return any(kw in q for kw in keywords)
+
     def is_math_query(self, query: str) -> bool:
         """
         Returns True only for genuine arithmetic expressions.
@@ -352,16 +484,86 @@ class AgentRouter:
         return has_digit and has_operator and only_math
 
     def run(self, query: str, session_id: str = "default", original_query: str = ""):
-        route_name, agent = self.route(original_query or query)
-        try:
-            result = agent.run(query, session_id=session_id)
-        except TypeError:
-            result = agent.run(query)
+        # Check if there's an active conversation for this session
+        active_conv = self.active_conversations.get(session_id)
+        
+        if active_conv:
+            agent_name = active_conv["agent_name"]
+            requested_route, requested_agent = self.route(original_query or query)
+            interruptible_routes = {
+                "coding", "deployment", "healthcare", "research", "resume",
+                "shopping", "finance", "fitness", "recipe", "local_discovery",
+                "travel", "flight", "hotel", "movie", "restaurant", "train",
+                "bus", "cab", "event", "vacation_package", "payment", "coupon",
+                "review", "cancellation", "notification", "support", "country",
+                "code_review", "debug", "test_case", "algorithm", "system_design",
+                "ml", "data_science", "rag", "mlops", "ai_architect",
+                "self_correction", "loan",
+            }
+            is_new_domain = (
+                requested_route in interruptible_routes
+                and requested_agent.name != agent_name
+            )
 
-        result["router"] = {
-            "root": "User",
-            "router_agent": "AgentRouter",
-            "selected_leaf_agent": agent.name,
-            "route": route_name
-        }
-        return self.safety_layer.enforce(result, query=query, route=route_name)
+            if is_new_domain:
+                del self.active_conversations[session_id]
+                active_conv = None
+            else:
+                # Continue the active conversation
+                conversation_state = active_conv["state"]
+                agent = self.get_agent_by_name(agent_name)
+                
+                try:
+                    result = agent.run(query, session_id=session_id, conversation_state=conversation_state)
+                except TypeError:
+                    result = agent.run(query, conversation_state=conversation_state)
+                
+                active_route = agent.agent_type.lower() if hasattr(agent, "agent_type") else agent_name.lower()
+                result["router"] = {
+                    "root": "User",
+                    "router_agent": "AgentRouter",
+                    "selected_leaf_agent": agent.name,
+                    "route": active_route,
+                }
+
+                # Update or clear conversation state based on response
+                if "conversation_state" in result:
+                    if result["conversation_state"].get("complete"):
+                        # Conversation complete, remove from active conversations
+                        del self.active_conversations[session_id]
+                    else:
+                        # Update conversation state
+                        self.active_conversations[session_id]["state"] = result["conversation_state"]
+        if not active_conv:
+            # Start a new conversation
+            route_name, agent = self.route(original_query or query)
+            try:
+                result = agent.run(query, session_id=session_id)
+            except TypeError:
+                result = agent.run(query)
+            
+            # Check if this agent started a conversation
+            if "conversation_state" in result and not result["conversation_state"].get("complete"):
+                self.active_conversations[session_id] = {
+                    "agent_name": agent.name,
+                    "state": result["conversation_state"]
+                }
+            
+            result["router"] = {
+                "root": "User",
+                "router_agent": "AgentRouter",
+                "selected_leaf_agent": agent.name,
+                "route": route_name
+            }
+        
+        # Add router info if not already present
+        if "router" not in result:
+            route_name, agent = self.route(original_query or query)
+            result["router"] = {
+                "root": "User",
+                "router_agent": "AgentRouter",
+                "selected_leaf_agent": agent.name,
+                "route": route_name
+            }
+        
+        return self.safety_layer.enforce(result, query=query, route=result["router"]["route"])

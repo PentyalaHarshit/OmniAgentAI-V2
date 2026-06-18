@@ -46,6 +46,7 @@ async def reset(request: Request):
     data = await request.json()
     session_id = data.get("session_id", "default")
     conversation_state.clear(session_id)
+    router.active_conversations.pop(session_id, None)
     chat_memory.clear(session_id)
     return {"message": "Conversation and state cleared"}
 
@@ -101,6 +102,13 @@ async def ask(request: Request):
             "review": "ReviewAgent", "cancellation": "CancellationAgent",
             "notification": "NotificationAgent", "support": "SupportAgent",
             "general": "GeneralAgent", "calculator": "CalculatorAgent",
+            "country": "CountryAgent", "code_review": "CodeReviewAgent",
+            "debug": "DebugAgent", "test_case": "TestCaseAgent",
+            "algorithm": "AlgorithmAgent", "system_design": "SystemDesignAgent",
+            "ml": "MLAgent", "data_science": "DataScienceAgent",
+            "rag": "RAGAgent", "mlops": "MLOpsAgent",
+            "ai_architect": "AIArchitectAgent",
+            "self_correction": "SelfCorrectionAgent", "loan": "LoanAgent",
         }
         new_agent_name = ROUTE_TO_AGENT.get(new_route, "")
         is_stateful_flow = is_healthcare_flow or is_trip_flow or is_movie_flow or is_shopping_flow
@@ -109,6 +117,9 @@ async def ask(request: Request):
             "shopping", "travel", "flight", "hotel", "movie", "restaurant",
             "train", "bus", "cab", "event", "vacation_package", "payment",
             "finance",
+            "code_review", "debug", "test_case", "algorithm",
+            "system_design", "ml", "data_science", "rag", "mlops",
+            "ai_architect", "self_correction", "loan", "country",
             "coupon", "review", "cancellation", "notification", "support",
             "calculator",
         }

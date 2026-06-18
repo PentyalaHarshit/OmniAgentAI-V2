@@ -113,3 +113,13 @@ If generated code contains a placeholder such as "Generated C++ solution templat
 
 Rule: Confidence Gate
 Return success only when code is generated, compilation passes, expected tests pass, template output is absent, and complexity is known.
+
+Algorithm: web_crawler_python
+Pattern: web_crawler_python
+Keywords: web crawler, crawler, scraper, multithreaded, threading, requests, beautifulsoup
+Category: software_engineering
+Use When: Need to crawl multiple web pages concurrently.
+Approach:
+Use queue.Queue for URLs, ThreadPoolExecutor for workers, requests for HTTP, BeautifulSoup for link extraction, and a visited set to avoid duplicates.
+Time Complexity: Depends on number of pages and network latency.
+Memory Complexity: O(P + L), where P is visited pages and L is queued/seen links.

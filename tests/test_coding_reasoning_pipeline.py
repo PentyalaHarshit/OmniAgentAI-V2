@@ -128,3 +128,57 @@ def test_retry_candidate_prefers_family_alternative():
     ]
 
     assert CodingCrew.pick_retry_candidate(candidates, selected)["algorithm"] == "fenwick_tree"
+
+
+def test_fastapi_crud_mysql_request_returns_project_code_not_deployment():
+    agent = CodingAgent()
+
+    result = agent.run(
+        "Build a FastAPI CRUD application with MySQL. "
+        "Generate full project code with SQLAlchemy models, schemas, routes, "
+        "database connection, requirements.txt, and run command. "
+        "Do not generate Docker files unless I ask for deployment."
+    )
+    answer = result["answer"]
+    crew = result["extra"]["crew_result"]
+
+    assert result["agent"] == "CodingAgent"
+    assert crew["selected_algorithm"] == "fastapi_crud_application"
+    assert crew["database"] == "mysql"
+    assert "FastAPI CRUD application with MySQL" in answer
+    assert "requirements.txt" in answer
+    assert "mysql+pymysql" in answer
+    assert "class Item" in answer
+    assert "class ItemCreate" in answer
+    assert "@app.post(\"/items\"" in answer
+    assert "@app.delete(\"/items/{item_id}\"" in answer
+    assert "uvicorn app.main:app --reload" in answer
+    assert "Dockerfile" not in answer
+    assert "docker-compose" not in answer
+    assert "#include <bits/stdc++.h>" not in answer
+
+
+def test_multithreaded_web_crawler_uses_software_engineering_mode():
+    agent = CodingAgent()
+
+    result = agent.run("Build a multithreaded web crawler in Python using requests and BeautifulSoup.")
+    answer = result["answer"]
+    crew = result["extra"]["crew_result"]
+
+    assert result["agent"] == "CodingAgent"
+    assert crew["mode"] == "software_engineering"
+    assert crew["generator_key"] == "web_crawler_python"
+    assert crew["selected_pattern"] == "Multithreaded Web Crawler"
+    assert crew["language"] == "python"
+    assert crew["status"] == "success"
+    assert "Selected Pattern: Multithreaded Web Crawler" in answer
+    assert "Language: Python" in answer
+    assert "Status: success" in answer
+    assert "ThreadPoolExecutor" in answer
+    assert "queue.Queue" in answer
+    assert "requests.Session" in answer
+    assert "BeautifulSoup" in answer
+    assert "centroid_decomposition" not in answer
+    assert "heavy_light_decomposition" not in answer
+    assert "lowest_common_ancestor" not in answer
+    assert "segment_tree" not in answer

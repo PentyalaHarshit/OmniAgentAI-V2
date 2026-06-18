@@ -45,3 +45,4 @@ def test_deployment_agent_renders_aws_and_nginx_sections():
     assert "Nginx Reverse Proxy" in result["answer"]
     assert result["extra"]["files"]["aws_ec2_user_data"]
     assert result["extra"]["files"]["nginx.conf"]
+

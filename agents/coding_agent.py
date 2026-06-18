@@ -32,6 +32,12 @@ class CodingAgent(BaseAgent):
         return self.response(query, thoughts + crew_thoughts, answer, {"crew_result": crew_result})
 
     def build_coding_answer(self, crew_result: dict):
+        if crew_result.get("mode") == "software_engineering":
+            return self.build_software_engineering_answer(crew_result)
+
+        if crew_result.get("app_files"):
+            return self.build_app_answer(crew_result)
+
         candidates = crew_result.get("algorithm_candidates", [])
         alternatives = [
             f"{idx}. {candidate['name']} - {candidate['score']}/100"
@@ -105,4 +111,67 @@ class CodingAgent(BaseAgent):
             f"Compile Output:\n{crew_result['compile_result']['output']}\n\n"
             f"Test Output:\n{crew_result['test_result']['output']}\n\n"
             f"Code:\n```{crew_result['language']}\n{crew_result['code']}\n```"
+        )
+
+    def build_app_answer(self, crew_result: dict):
+        files = crew_result["app_files"]
+        file_order = [
+            ("requirements.txt", "text"),
+            (".env.example", "bash"),
+            ("app/database.py", "python"),
+            ("app/models.py", "python"),
+            ("app/schemas.py", "python"),
+            ("app/main.py", "python"),
+        ]
+        parts = [
+            "Coding Agent selected.",
+            "",
+            "FastAPI CRUD application with MySQL.",
+            "",
+            "Project files:",
+        ]
+        for path, language in file_order:
+            if path in files:
+                parts.append(f"\n### {path}\n```{language}\n{files[path].strip()}\n```")
+
+        parts += [
+            "",
+            "Run command:",
+            "```bash",
+            "pip install -r requirements.txt",
+            crew_result.get("run_command", "uvicorn app.main:app --reload"),
+            "```",
+            "",
+            "Notes:",
+            "- Uses SQLAlchemy for the MySQL connection and ORM model.",
+            "- Uses Pydantic schemas for create, update, and read payloads.",
+            "- Provides POST, list, get, update, and delete routes for `/items`.",
+            "- Docker files are not generated because deployment was not requested.",
+        ]
+        return "\n".join(parts)
+
+    def build_software_engineering_answer(self, crew_result: dict):
+        verification = crew_result.get("verification", {})
+        return (
+            "Coding Agent selected.\n\n"
+            "Mode: SoftwareEngineeringMode\n\n"
+            f"Selected Pattern: {crew_result.get('selected_pattern', crew_result.get('selected_algorithm_label'))}\n"
+            f"Generator Key: {crew_result.get('generator_key', 'n/a')}\n"
+            f"Language: {crew_result.get('language', 'python').title()}\n"
+            f"Status: {crew_result.get('status', 'unknown')}\n\n"
+            "Approach:\n"
+            "- Use queue.Queue for URLs.\n"
+            "- Use ThreadPoolExecutor for workers.\n"
+            "- Use requests for HTTP.\n"
+            "- Use BeautifulSoup for link extraction.\n"
+            "- Use a visited set guarded by a lock to avoid duplicates.\n\n"
+            "Complexity:\n"
+            f"- Time: {verification.get('time_complexity', 'Depends on pages and network latency')}\n"
+            f"- Memory: {verification.get('memory_complexity', 'Depends on queued and visited URLs')}\n\n"
+            "Run command:\n"
+            "```bash\n"
+            f"{crew_result.get('run_command', 'python crawler.py https://example.com')}\n"
+            "```\n\n"
+            "Code:\n"
+            f"```python\n{crew_result.get('code', '').strip()}\n```"
         )
