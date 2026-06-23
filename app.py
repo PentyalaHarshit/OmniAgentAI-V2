@@ -2,9 +2,11 @@ from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 
 from llm_tree.free_llm_tree import FreeLLMTree
 from agents.agent_router import AgentRouter
+from agents.web_agent import WebAgent
 from tools.upload_manager import UploadManager
 from tools.conversation_state import ConversationState
 from tools.chat_memory import ChatMemory
@@ -16,9 +18,14 @@ templates = Jinja2Templates(directory="templates")
 
 llm_tree = FreeLLMTree()
 router = AgentRouter()
+web_agent = WebAgent()
 upload_manager = UploadManager(upload_dir="uploads")
 conversation_state = ConversationState()
 chat_memory = ChatMemory()
+
+
+class QueryRequest(BaseModel):
+    query: str
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -103,6 +110,7 @@ async def ask(request: Request):
             "notification": "NotificationAgent", "support": "SupportAgent",
             "general": "GeneralAgent", "calculator": "CalculatorAgent",
             "country": "CountryAgent", "code_review": "CodeReviewAgent",
+            "web": "WebAgent", "sports": "SportsAgent", "learning": "LearningAgent", "quiz": "QuizAgent",
             "debug": "DebugAgent", "test_case": "TestCaseAgent",
             "algorithm": "AlgorithmAgent", "system_design": "SystemDesignAgent",
             "ml": "MLAgent", "data_science": "DataScienceAgent",
@@ -120,7 +128,7 @@ async def ask(request: Request):
             "code_review", "debug", "test_case", "algorithm",
             "system_design", "ml", "data_science", "rag", "mlops",
             "ai_architect", "self_correction", "loan", "country",
-            "coupon", "review", "cancellation", "notification", "support",
+            "sports", "learning", "quiz", "coupon", "review", "cancellation", "notification", "support",
             "calculator",
         }
         is_new_domain = bool(
@@ -199,3 +207,13 @@ async def ask(request: Request):
 @app.get("/health")
 def health():
     return {"status": "ok", "app": "OmniAgentAI v2 ChatGPT Style Upload Chat"}
+
+
+@app.post("/web/search")
+def web_search(request: QueryRequest):
+    return web_agent.run(request.query)
+
+
+@app.post("/web/cache")
+def web_cache(request: QueryRequest):
+    return web_agent.retrieve_cache(request.query)

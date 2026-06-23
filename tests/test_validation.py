@@ -103,6 +103,44 @@ def test_general_agent_answers_who_invented_computer_from_verified_fact():
     assert result["extra"].get("source_stage") == "built_in_facts"
 
 
+def test_general_agent_explains_quantum_computing_simply():
+    agent = GeneralAgent()
+    result = agent.run("Explain quantum computing in simple terms.")
+
+    assert result["agent"] == "GeneralAgent"
+    assert result["extra"].get("source_stage") == "simple_explanation"
+    assert "Quantum computing is a new type of computing" in result["answer"]
+    assert "Qubit = 0, 1, or both at the same time" in result["answer"]
+    assert "Imagine a coin." in result["answer"]
+    assert "1. Superposition" in result["answer"]
+    assert "2. Entanglement" in result["answer"]
+    assert "3. Quantum Parallelism" in result["answer"]
+    assert "- Drug discovery" in result["answer"]
+    assert "still experimental" in result["answer"]
+
+
+def test_general_agent_uses_previous_context_for_simple_explanation(tmp_path):
+    from tools.chat_memory import ChatMemory
+
+    session_id = "quantum_followup"
+    memory = ChatMemory(str(tmp_path / "chat_memory.json"))
+    agent = GeneralAgent()
+    agent.memory = memory
+
+    first = agent.run("Explain quantum computing in simple terms.", session_id=session_id)
+    memory.add(session_id, "user", "Explain quantum computing in simple terms.")
+    memory.add(session_id, "assistant", first["answer"])
+
+    followup = agent.run("Simple Explanation", session_id=session_id)
+
+    assert followup["extra"].get("source_stage") == "memory_context_transform"
+    assert followup["extra"].get("skip_web_search") is True
+    assert followup["extra"].get("skip_verification") is True
+    assert "Quantum computing is a new type of computing that uses qubits" in followup["answer"]
+    assert "Imagine a spinning coin." in followup["answer"]
+    assert "Drug discovery" not in followup["answer"]
+
+
 def test_answer_compression():
     from agents.general_agent import AnswerExtractionAgent
     extractor = AnswerExtractionAgent()

@@ -49,7 +49,7 @@ def test_benchmark_agent_model_comparison():
     assert "Best Use Cases" in result["answer"]
 
 
-def test_router_sends_research_examples_to_research_agent():
+def test_router_sends_research_examples_to_general_agent():
     router = AgentRouter()
 
     for query in [
@@ -59,5 +59,5 @@ def test_router_sends_research_examples_to_research_agent():
         "Can AI invent new algorithms?",
     ]:
         route, agent = router.route(query)
-        assert route == "research"
-        assert agent.name == "ResearchAgent"
+        assert route == "general"
+        assert agent.name == "GeneralAgent"

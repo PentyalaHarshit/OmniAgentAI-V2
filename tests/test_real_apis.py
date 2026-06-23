@@ -108,6 +108,46 @@ def test_sports_tool_uses_sportsdb(monkeypatch):
     assert "TheSportsDB" in answer
 
 
+def test_sports_tool_uses_espn_standings(monkeypatch):
+    def fake_get(url, as_text=False):
+        assert "basketball/nba/standings" in url
+        return {
+            "children": [{
+                "name": "Eastern Conference",
+                "standings": {
+                    "entries": [{
+                        "team": {"displayName": "Boston Celtics"},
+                        "stats": [
+                            {"name": "overall", "displayValue": "60-22"},
+                            {"name": "rank", "displayValue": "1"},
+                        ],
+                    }]
+                },
+            }]
+        }
+
+    monkeypatch.setattr(mcp_live_tools, "_get", fake_get)
+
+    answer = SportsTool().execute("NBA standings")
+
+    assert "NBA Standings" in answer
+    assert "Boston Celtics" in answer
+    assert "ESPN public standings API" in answer
+
+
+def test_sports_agent_returns_live_source_metadata(monkeypatch):
+    from agents.sports_agent import SportsAgent
+
+    monkeypatch.setattr(SportsTool, "execute", lambda self, query: "live standings answer")
+
+    result = SportsAgent().run("FIFA World Cup 2026 standings")
+
+    assert result["agent"] == "SportsAgent"
+    assert result["answer"] == "live standings answer"
+    assert result["extra"]["source_stage"] == "sports_api"
+    assert result["extra"]["verification"]["verified"] is True
+
+
 def test_search_api_tool_uses_duckduckgo_without_key(monkeypatch):
     monkeypatch.delenv("SERPAPI_API_KEY", raising=False)
     monkeypatch.setattr(mcp_live_tools, "_get", lambda url, as_text=False: {

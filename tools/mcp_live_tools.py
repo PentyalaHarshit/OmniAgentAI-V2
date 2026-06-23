@@ -284,14 +284,44 @@ class NewsTool:
 
 class SportsTool:
     name = "sports"
-    description = "Fetches live scores, team info, and recent match results."
+    description = "Fetches live scores, standings, team info, and recent match results."
     input_schema = {"query": "string – sports question (team, league, score, match)"}
 
     TRIGGERS = re.compile(
         r"\b(sport|football|soccer|basketball|cricket|tennis|nba|nfl|ipl|premier league|"
-        r"la liga|bundesliga|serie a|score|match|game|team|player|standings|fixture|result)\b",
+        r"world cup|fifa|la liga|bundesliga|serie a|score|match|game|team|player|"
+        r"standings|table|points table|fixture|result)\b",
         re.I
     )
+    STANDINGS_TRIGGERS = re.compile(r"\b(standings|table|points table|rankings?)\b", re.I)
+
+    ESPN_STANDINGS = [
+        (
+            re.compile(r"\bnba|basketball\b", re.I),
+            "NBA",
+            "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings",
+        ),
+        (
+            re.compile(r"\bnfl\b", re.I),
+            "NFL",
+            "https://site.api.espn.com/apis/v2/sports/football/nfl/standings",
+        ),
+        (
+            re.compile(r"\bpremier league|epl\b", re.I),
+            "Premier League",
+            "https://site.api.espn.com/apis/v2/sports/soccer/eng.1/standings",
+        ),
+        (
+            re.compile(r"\bfifa|world cup\b", re.I),
+            "FIFA World Cup",
+            "https://site.api.espn.com/apis/v2/sports/soccer/fifa.world/standings",
+        ),
+        (
+            re.compile(r"\bipl|indian premier league\b", re.I),
+            "IPL",
+            "https://site.api.espn.com/apis/v2/sports/cricket/ipl/standings",
+        ),
+    ]
 
     # Team name → TheSportsDB team ID (common ones)
     TEAM_IDS = {
@@ -315,9 +345,86 @@ class SportsTool:
         data = _get(url)
         return data.get("results", []) if data else []
 
+    def _standings_source(self, query: str) -> tuple[str, str] | None:
+        for pattern, label, url in self.ESPN_STANDINGS:
+            if pattern.search(query):
+                return label, url
+        return None
+
+    @staticmethod
+    def _extract_stat(stats: list[dict], names: set[str]) -> str:
+        for stat in stats or []:
+            if (stat.get("name") or "").lower() in names:
+                return str(stat.get("displayValue") or stat.get("value") or "")
+        return ""
+
+    def _parse_espn_standings(self, data: dict, label: str) -> str:
+        entries = []
+        for child in data.get("children", []) or []:
+            group_name = child.get("name") or child.get("abbreviation") or ""
+            standings = child.get("standings", {}) or {}
+            for entry in standings.get("entries", []) or []:
+                team = entry.get("team", {}) or {}
+                stats = entry.get("stats", []) or []
+                entries.append({
+                    "group": group_name,
+                    "team": team.get("displayName") or team.get("name") or "Unknown",
+                    "record": self._extract_stat(stats, {"overall", "record"}),
+                    "points": self._extract_stat(stats, {"points", "pts"}),
+                    "rank": self._extract_stat(stats, {"rank", "playoffseed"}),
+                })
+
+        if not entries:
+            for entry in data.get("standings", {}).get("entries", []) or []:
+                team = entry.get("team", {}) or {}
+                stats = entry.get("stats", []) or []
+                entries.append({
+                    "group": "",
+                    "team": team.get("displayName") or team.get("name") or "Unknown",
+                    "record": self._extract_stat(stats, {"overall", "record"}),
+                    "points": self._extract_stat(stats, {"points", "pts"}),
+                    "rank": self._extract_stat(stats, {"rank", "playoffseed"}),
+                })
+
+        if not entries:
+            return ""
+
+        lines = [f"**{label} Standings**", ""]
+        current_group = None
+        for index, row in enumerate(entries[:20], start=1):
+            if row["group"] and row["group"] != current_group:
+                current_group = row["group"]
+                lines.append(f"**{current_group}**")
+            suffix = []
+            if row["record"]:
+                suffix.append(f"Record: {row['record']}")
+            if row["points"]:
+                suffix.append(f"Pts: {row['points']}")
+            if row["rank"]:
+                suffix.append(f"Rank: {row['rank']}")
+            lines.append(f"{index}. {row['team']}" + (f" ({', '.join(suffix)})" if suffix else ""))
+
+        lines.append("\n*Source: ESPN public standings API*")
+        return "\n".join(lines)
+
+    def _standings(self, query: str) -> str:
+        source = self._standings_source(query)
+        if not source:
+            return ""
+        label, url = source
+        data = _get(url)
+        if not data:
+            return ""
+        return self._parse_espn_standings(data, label)
+
     def execute(self, query: str) -> str:
         if not self.TRIGGERS.search(query):
             return ""
+
+        if self.STANDINGS_TRIGGERS.search(query):
+            standings = self._standings(query)
+            if standings:
+                return standings
 
         # Extract potential team/player name
         clean = re.sub(

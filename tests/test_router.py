@@ -85,6 +85,9 @@ def test_router_precision_general_vs_shopping():
     route, agent = r.route("Who created Java?")
     assert route == "general"
 
+    route, agent = r.route("Why did the Roman Empire fall?")
+    assert route == "general"
+
 
 def test_router_priority_deployment_before_general_and_coding():
     r = AgentRouter()
@@ -196,3 +199,67 @@ def test_multithreaded_web_crawler_routes_to_coding():
 
     assert route == "coding"
     assert agent.name == "CodingAgent"
+
+
+def test_router_sends_sports_standings_to_sports_agent():
+    router = AgentRouter()
+
+    examples = [
+        "FIFA World Cup 2026 standings",
+        "IPL points table",
+        "NBA standings",
+        "Premier League table",
+    ]
+
+    for query in examples:
+        route, agent = router.route(query)
+        assert route == "sports", query
+        assert agent.name == "SportsAgent", query
+
+
+def test_router_sends_information_queries_to_general_agent():
+    router = AgentRouter()
+
+    examples = [
+        "What is agentic AI?",
+        "Explain Retrieval-Augmented Generation with examples.",
+        "What is the difference between CrewAI and AutoGen?",
+        "How does a vector database work?",
+        "Explain quantum computing in simple terms.",
+        "What causes black holes to form?",
+        "How does CRISPR gene editing work?",
+        "Find recent research papers on multi-agent AI systems.",
+        "Summarize the latest developments in agentic RAG.",
+        "Compare Tree of Thoughts and Chain of Thought reasoning.",
+        "What are the latest AI model releases this month?",
+        "What are the latest trends in autonomous AI agents?",
+        "Summarize today's major AI news.",
+        "Explain distributed systems with examples.",
+        "How does Kubernetes work internally?",
+        "Who invented the World Wide Web?",
+        "What is the history of artificial intelligence?",
+        "Explain the evolution of programming languages.",
+    ]
+
+    for query in examples:
+        route, agent = router.route(query)
+        assert route == "general", query
+        assert agent.name == "GeneralAgent", query
+
+
+def test_router_sends_learning_queries_to_learning_agent():
+    router = AgentRouter()
+
+    examples = [
+        "Teach me AWS from beginner to advanced.",
+        "Teach me Kubernetes",
+        "Teach me Reinforcement Learning",
+        "Teach me System Design",
+        "Create a Kubernetes roadmap",
+        "I want to learn AWS",
+    ]
+
+    for query in examples:
+        route, agent = router.route(query)
+        assert route == "learning", query
+        assert agent.name == "LearningAgent", query

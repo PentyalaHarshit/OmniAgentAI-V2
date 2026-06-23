@@ -14,6 +14,8 @@ class ReasoningCandidate:
     evidence: list[dict[str, Any]] = field(default_factory=list)
     strengths: list[str] = field(default_factory=list)
     risks: list[str] = field(default_factory=list)
+    selected_branch: str = ""
+    plan: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -24,6 +26,8 @@ class ReasoningCandidate:
             "evidence": self.evidence,
             "strengths": self.strengths,
             "risks": self.risks,
+            "selected_branch": self.selected_branch,
+            "plan": self.plan,
         }
 
 
@@ -109,27 +113,55 @@ class ToTReasoningAgent:
 
     def run(self, query: str) -> ReasoningCandidate:
         terms = _comparison_terms(query)
-        branches = ["accuracy-first", "cost-first", "risk-first"]
+        selected_branch = "historical_analysis" if re.search(r"\b(why|history|causes?|fell|fall)\b", query, re.I) else "analysis_plan"
+        branches = ["political-cause", "economic-cause", "military-cause", "external-pressure"]
         if len(terms) >= 2:
             branches = [f"{terms[0]}-first", f"{terms[1]}-first", "hybrid"]
+            selected_branch = "hybrid"
 
-        answer = _keyword_answer(query)
-        answer += (
-            "\n\nReasoning branches checked: "
-            + ", ".join(branches)
-            + ". The selected path is the one with the best long-term fit, not just the quickest answer."
-        )
+        if selected_branch == "historical_analysis":
+            plan = [
+                "Find political causes",
+                "Find economic causes",
+                "Find military causes",
+                "Find external invasions",
+                "Generate final summary",
+            ]
+        elif selected_branch == "hybrid":
+            plan = [
+                f"Find evidence for {terms[0]} strengths",
+                f"Find evidence for {terms[1]} strengths",
+                "Compare tradeoffs and risks",
+                "Identify where each option fits best",
+                "Generate final recommendation",
+            ]
+        else:
+            plan = [
+                "Find key background facts",
+                "Find main causes or mechanisms",
+                "Find important constraints",
+                "Compare source evidence",
+                "Generate final summary",
+            ]
+
+        answer = json.dumps({
+            "selected_branch": selected_branch,
+            "plan": plan,
+            "confidence": 0.87,
+        }, indent=2)
         return ReasoningCandidate(
             agent=self.name,
             answer=answer,
             reasoning_summary=[
-                "Generated multiple plausible branches.",
-                "Compared each branch against fit, risk, and operational cost.",
-                f"Selected branch: {branches[-1] if len(terms) >= 2 else branches[0]}.",
+                "Generated a retrieval-first reasoning plan.",
+                f"Checked branches: {', '.join(branches)}.",
+                f"Selected branch: {selected_branch}.",
             ],
-            confidence=0.82,
-            strengths=["compares alternatives", "handles tradeoffs"],
-            risks=["branch scores are heuristic without external benchmarks"],
+            confidence=0.87,
+            strengths=["plans retrieval before final answer", "keeps final claims source-grounded"],
+            risks=["plan still depends on source quality"],
+            selected_branch=selected_branch,
+            plan=plan,
         )
 
 

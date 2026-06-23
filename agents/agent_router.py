@@ -28,6 +28,10 @@ from agents.cancellation_agent import CancellationAgent
 from agents.notification_agent import NotificationAgent
 from agents.support_agent import SupportAgent
 from agents.general_agent import GeneralAgent
+from agents.web_agent import WebAgent
+from agents.sports_agent import SportsAgent
+from agents.learning_agent import LearningAgent
+from agents.quiz_agent import QuizAgent
 from agents.country_agent import CountryAgent
 from agents.code_review_agent import CodeReviewAgent
 from agents.debug_agent import DebugAgent
@@ -66,6 +70,92 @@ DEPLOYMENT_KEYWORDS = [
     "ci/cd", "github actions", "gitlab ci", "jenkins", "circleci",
     "terraform", "ansible", "infrastructure as code",
     "self-host", "self host", "vps", "server setup",
+]
+
+SPORTS_KEYWORDS = [
+    "world cup",
+    "fifa",
+    "ipl",
+    "nba",
+    "nfl",
+    "premier league",
+    "epl",
+    "football",
+    "soccer",
+    "cricket",
+    "basketball",
+    "standings",
+    "points table",
+    "league table",
+    "league",
+]
+
+GENERAL_AGENT_TOPICS = [
+    "agentic ai",
+    "retrieval-augmented generation",
+    "retrieval augmented generation",
+    "rag",
+    "crewai",
+    "autogen",
+    "vector database",
+    "quantum computing",
+    "black holes",
+    "crispr",
+    "multi-agent ai",
+    "multi agent ai",
+    "agentic rag",
+    "tree of thoughts",
+    "chain of thought",
+    "ai model releases",
+    "autonomous ai agents",
+    "ai news",
+    "aws",
+    "distributed systems",
+    "kubernetes",
+    "world wide web",
+    "artificial intelligence",
+    "programming languages",
+]
+
+GENERAL_AGENT_STARTERS = [
+    "what is",
+    "what are",
+    "explain",
+    "how does",
+    "how do",
+    "what causes",
+    "summarize",
+    "compare",
+    "teach me",
+    "find recent research papers",
+    "find research papers",
+    "latest trends",
+    "latest developments",
+    "latest ai model releases",
+    "today's major",
+    "history of",
+    "can ai",
+    "research",
+]
+
+LEARNING_KEYWORDS = [
+    "teach me",
+    "tutorial",
+    "learn",
+    "course",
+    "roadmap",
+]
+
+QUIZ_KEYWORDS = [
+    "multiple choice",
+    "mcq",
+    "quiz",
+    "which of the following",
+    "a)",
+    "b)",
+    "c)",
+    "d)",
+    "correct answer",
 ]
 
 CODING_KEYWORDS = [
@@ -137,6 +227,10 @@ class AgentRouter:
         self.notification_agent = NotificationAgent()
         self.support_agent = SupportAgent()
         self.general_agent = GeneralAgent()
+        self.web_agent = WebAgent()
+        self.sports_agent = SportsAgent()
+        self.learning_agent = LearningAgent()
+        self.quiz_agent = QuizAgent()
         self.country_agent = CountryAgent()
         self.code_review_agent = CodeReviewAgent()
         self.debug_agent = DebugAgent()
@@ -162,16 +256,116 @@ class AgentRouter:
         if self.is_math_query(query):
             return "calculator", self.calculator_agent
 
+        if self.is_sports_query(q):
+            return "sports", self.sports_agent
+
         if self.is_loan_query(q):
             return "loan", self.loan_agent
+
+        if self.is_quiz_query(query):
+            return "quiz", self.quiz_agent
+
+        if self.is_learning_query(q):
+            return "learning", self.learning_agent
+
+        if self.is_general_agent_query(q):
+            if self._is_country_query(q):
+                return "country", self.country_agent
+            return "general", self.general_agent
+
+        if "tensorflow" in q:
+            return "tensorflow", self.tensorflow_agent
+
+        if self.is_debug_query(q):
+            return "debug", self.debug_agent
+
+        if self.is_test_case_query(q):
+            return "test_case", self.test_case_agent
+
+        if self.is_explicit_coding_query(q):
+            return "coding", self.coding_agent
+
+        if self.is_algorithm_query(q):
+            return "algorithm", self.algorithm_agent
+
+        if self.is_ai_architect_query(q):
+            return "ai_architect", self.ai_architect_agent
+
+        if self.is_system_design_query(q):
+            return "system_design", self.system_design_agent
+
+        if self.is_mlops_query(q):
+            return "mlops", self.mlops_agent
+
+        if self.is_ml_query(q):
+            return "ml", self.ml_agent
+
+        if self.is_data_science_query(q):
+            return "data_science", self.data_science_agent
 
         if self.is_tensorflow_query(q):
             return "tensorflow", self.tensorflow_agent
 
+        if self.is_rag_query(q):
+            return "rag", self.rag_agent
+
+        if self.has_positive_deployment_intent(q):
+            return "deployment", self.deployment_agent
+
+        if any(k in q for k in [
+            "health", "hospital", "doctor", "symptom", "pain", "diabetes",
+            "chest pain", "medical", "fever", "breathing", "blood pressure",
+        ]):
+            return "healthcare", self.healthcare_agent
+
+        shopping_intent_phrases = [
+            "i want to buy", "buy", "purchase", "shopping", "recommend",
+            "best", "compare", "price of", "under $", "deal", "discount",
+            "add to cart",
+        ]
+        shopping_products = [
+            "phone", "laptop", "headphones", "monitor", "keyboard", "mouse",
+            "tablet", "camera", "gpu", "iphone", "samsung", "apple", "pixel",
+        ]
+        if has_any_phrase(q, shopping_intent_phrases) and has_any_word(q, shopping_products):
+            return "shopping", self.shopping_agent
+
+        if any(k in q for k in ["payment", "pay", "card", "checkout", "wallet"]):
+            return "payment", self.payment_agent
+        if any(k in q for k in ["cab", "taxi", "uber", "lyft", "ride"]):
+            return "cab", self.cab_agent
+        if any(k in q for k in ["flight", "plane", "airport", "airline"]):
+            return "flight", self.flight_agent
+        if any(k in q for k in ["hotel", "room", "stay", "check-in", "checkout", "resort"]):
+            return "hotel", self.hotel_agent
+        if any(k in q for k in ["movie", "cinema", "theater", "showtime", "ticket"]):
+            return "movie", self.movie_agent
+        if any(k in q for k in ["restaurant", "dinner", "lunch", "table", "reservation", "food"]):
+            return "restaurant", self.restaurant_agent
+        if any(k in q for k in ["train", "railway", "rail"]):
+            return "train", self.train_agent
+        if any(k in q for k in ["bus", "coach"]):
+            return "bus", self.bus_agent
+        if any(k in q for k in ["event", "concert", "game", "festival", "conference"]):
+            return "event", self.event_agent
+        if any(k in q for k in ["vacation", "package", "trip package", "holiday", "plan a 5-day vacation"]):
+            return "vacation_package", self.vacation_package_agent
+        if any(k in q for k in ["travel", "trip", "itinerary", "tour", "destination"]):
+            return "travel", self.travel_agent
+
+        if self.is_web_query(q):
+            return "web", self.web_agent
+
+        if self.is_general_factual_question(q):
+            if self._is_country_query(q):
+                return "country", self.country_agent
+            return "general", self.general_agent
+
         # Use new CodingAIRouter for coding/AI routing
         coding_route = self.coding_ai_router.route(q)
         if coding_route == "deployment":
-            return "deployment", self.deployment_agent
+            if self.has_positive_deployment_intent(q):
+                return "deployment", self.deployment_agent
         elif coding_route == "code_review":
             return "code_review", self.code_review_agent
         elif coding_route == "software_engineering":
@@ -179,6 +373,10 @@ class AgentRouter:
         elif coding_route == "ai_architect":
             return "ai_architect", self.ai_architect_agent
         elif coding_route == "coding":
+            if self.is_explicit_coding_query(q):
+                return "coding", self.coding_agent
+
+        if self.is_explicit_coding_query(q):
             return "coding", self.coding_agent
 
         # Other domain routing
@@ -252,11 +450,8 @@ class AgentRouter:
         ]):
             return "support", self.support_agent
 
-        if self.is_general_factual_question(q):
-            # Country-specific queries get a dedicated agent
-            if self._is_country_query(q):
-                return "country", self.country_agent
-            return "general", self.general_agent
+        if self.is_web_query(q):
+            return "web", self.web_agent
 
         if any(k in q for k in ["research", "paper", "literature", "survey", "research gap", "methodology"]):
             return "research", self.research_agent
@@ -338,21 +533,102 @@ class AgentRouter:
         ]
         return any(phrase in q for phrase in phrases)
 
+    def is_sports_query(self, q: str) -> bool:
+        return any(re.search(rf"\b{re.escape(keyword)}\b", q) for keyword in SPORTS_KEYWORDS)
+
+    def is_general_agent_query(self, q: str) -> bool:
+        if self.is_sports_query(q):
+            return False
+        if (
+            has_any_word(q, ["buy", "purchase", "recommend", "price", "deal", "discount", "best"])
+            or re.search(r"\bunder\s+\$?\d+", q)
+        ) and has_any_word(
+            q,
+            [
+                "phone", "laptop", "headphones", "monitor", "keyboard", "mouse",
+                "tablet", "camera", "gpu", "iphone", "samsung", "apple", "pixel",
+            ],
+        ):
+            return False
+        if q.startswith("compare") and has_any_word(
+            q,
+            ["phone", "laptop", "iphone", "samsung", "apple", "pixel", "gpu", "camera"],
+        ):
+            return False
+        if has_any_word(q, ["symptom", "pain", "diabetes", "fever", "medical", "doctor", "hospital"]):
+            return False
+        if has_any_word(q, ["deploy", "deployment", "dockerize", "containerize"]):
+            return False
+        if has_any_phrase(q, GENERAL_AGENT_STARTERS):
+            return True
+        return has_any_phrase(q, GENERAL_AGENT_TOPICS) and has_any_word(
+            q,
+            [
+                "what", "explain", "how", "why", "compare", "summarize",
+                "teach", "find", "latest", "recent", "history", "evolution",
+            ],
+        )
+
+    def is_learning_query(self, q: str) -> bool:
+        return any(re.search(rf"\b{re.escape(keyword)}\b", q) for keyword in LEARNING_KEYWORDS)
+
+    def is_quiz_query(self, query: str) -> bool:
+        q = query.lower()
+        if any(keyword in q for keyword in QUIZ_KEYWORDS):
+            return True
+        option_count = len(re.findall(r"(?im)^\s*[a-d]\)\s+\S+", query))
+        return option_count >= 2
+
+    def is_web_query(self, q: str) -> bool:
+        phrases = [
+            "latest", "current", "today", "now", "recent", "breaking",
+            "news", "live", "web search", "search web", "search online",
+            "look up", "lookup", "find online", "google",
+        ]
+        return any(phrase in q for phrase in phrases)
+
     def is_strong_coding_query(self, q: str) -> bool:
         return any(re.search(pattern, q, re.I) for pattern in STRONG_CODING_PATTERNS)
+
+    def is_explicit_coding_query(self, q: str) -> bool:
+        if self.is_general_factual_question(q):
+            return False
+        if any(k in q for k in [
+            "book", "booking", "hotel", "room", "flight", "ticket",
+            "travel", "trip", "restaurant", "reservation", "cab", "taxi",
+            "train", "bus", "movie", "event",
+        ]):
+            return False
+        if self.is_strong_coding_query(q) or self.is_app_code_query(q):
+            return True
+        coding_actions = [
+            "write", "generate", "create", "implement", "build",
+            "code", "program", "script", "function", "class",
+        ]
+        coding_targets = [
+            "c++", "cpp", "python", "java", "javascript", "typescript",
+            "algorithm", "api", "app", "project", "crawler", "scraper",
+            "function", "class", "database", "sql", "backend", "frontend",
+        ]
+        return has_any_word(q, coding_actions) and has_any_phrase(q, coding_targets)
 
     def is_general_factual_question(self, q: str) -> bool:
         """Return True for fact-seeking questions that may mention coding terms."""
         factual_starts = (
             "who invented", "who discovered", "who created", "who won",
             "who defeated", "who founded", "who is", "what is", "when was",
-            "when did", "where is", "why is", "how does", "how long",
+            "when did", "where is", "why is", "why did", "why was",
+            "why were", "how does", "how long",
         )
         if q.startswith(factual_starts):
             coding_actions = (
                 "write", "generate", "create code", "implement", "build",
                 "debug", "fix", "compile", "run", "solve", "leetcode",
+                "deploy", "deployment", "docker", "kubernetes", "api",
+                "fastapi", "crud",
             )
+            if has_any_phrase(q, ["laptop", "phone", "iphone", "samsung", "under $"]):
+                return False
             return not has_any_word(q, list(coding_actions))
         return has_any_phrase(q, ["capital of", "population of", "gdp of"])
 
@@ -496,9 +772,9 @@ class AgentRouter:
                 "travel", "flight", "hotel", "movie", "restaurant", "train",
                 "bus", "cab", "event", "vacation_package", "payment", "coupon",
                 "review", "cancellation", "notification", "support", "country",
-                "code_review", "debug", "test_case", "algorithm", "system_design",
+                "web", "code_review", "debug", "test_case", "algorithm", "system_design",
                 "ml", "data_science", "rag", "mlops", "ai_architect",
-                "self_correction", "loan",
+                "self_correction", "loan", "sports", "learning", "quiz",
             }
             is_new_domain = (
                 requested_route in interruptible_routes
@@ -537,10 +813,11 @@ class AgentRouter:
         if not active_conv:
             # Start a new conversation
             route_name, agent = self.route(original_query or query)
+            run_query = original_query or query
             try:
-                result = agent.run(query, session_id=session_id)
+                result = agent.run(run_query, session_id=session_id)
             except TypeError:
-                result = agent.run(query)
+                result = agent.run(run_query)
             
             # Check if this agent started a conversation
             if "conversation_state" in result and not result["conversation_state"].get("complete"):

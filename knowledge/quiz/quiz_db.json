@@ -1,0 +1,130 @@
+[
+  {
+    "id": 1,
+    "category": "general_knowledge",
+    "difficulty": "easy",
+    "keywords": ["red planet", "planet known as the red planet"],
+    "question": "Which planet is known as the Red Planet?",
+    "options": {"A": "Venus", "B": "Mars", "C": "Jupiter", "D": "Saturn"},
+    "answer": "B",
+    "answer_text": "Mars",
+    "explanation": "Mars appears red because iron oxide, or rust-like dust, is common on its surface.",
+    "wrong": {
+      "Venus": "Venus is very hot and cloudy, but it is not called the Red Planet.",
+      "Jupiter": "Jupiter is a gas giant, not the Red Planet.",
+      "Saturn": "Saturn is best known for its rings, not for a red appearance."
+    }
+  },
+  {
+    "id": 2,
+    "category": "geography",
+    "difficulty": "easy",
+    "keywords": ["largest ocean"],
+    "question": "Which is the largest ocean on Earth?",
+    "options": {"A": "Atlantic Ocean", "B": "Indian Ocean", "C": "Pacific Ocean", "D": "Arctic Ocean"},
+    "answer": "C",
+    "answer_text": "Pacific Ocean",
+    "explanation": "The Pacific Ocean is the largest and deepest ocean on Earth.",
+    "wrong": {
+      "Atlantic Ocean": "The Atlantic is the second-largest ocean.",
+      "Indian Ocean": "The Indian Ocean is smaller than the Pacific and Atlantic.",
+      "Arctic Ocean": "The Arctic Ocean is the smallest ocean."
+    }
+  },
+  {
+    "id": 3,
+    "category": "geography",
+    "difficulty": "easy",
+    "keywords": ["capital of australia"],
+    "question": "What is the capital of Australia?",
+    "options": {"A": "Sydney", "B": "Melbourne", "C": "Canberra", "D": "Perth"},
+    "answer": "C",
+    "answer_text": "Canberra",
+    "explanation": "Canberra is the capital city of Australia.",
+    "wrong": {
+      "Sydney": "Sydney is Australia's largest city, but it is not the capital.",
+      "Melbourne": "Melbourne is a major city, but it is not the capital.",
+      "Perth": "Perth is a major city in Western Australia, not the national capital."
+    }
+  },
+  {
+    "id": 4,
+    "category": "technology",
+    "difficulty": "easy",
+    "keywords": ["invented world wide web", "invented the world wide web", "created world wide web"],
+    "question": "Who invented the World Wide Web?",
+    "options": {"A": "Bill Gates", "B": "Tim Berners-Lee", "C": "Steve Jobs", "D": "Vint Cerf"},
+    "answer": "B",
+    "answer_text": "Tim Berners-Lee",
+    "explanation": "Tim Berners-Lee invented the World Wide Web while working at CERN.",
+    "wrong": {
+      "Bill Gates": "Bill Gates co-founded Microsoft, but he did not invent the Web.",
+      "Steve Jobs": "Steve Jobs co-founded Apple, but he did not invent the Web.",
+      "Vint Cerf": "Vint Cerf helped develop TCP/IP, but not the World Wide Web."
+    }
+  },
+  {
+    "id": 5,
+    "category": "coding_dsa",
+    "difficulty": "easy",
+    "keywords": ["bfs", "breadth first search"],
+    "question": "Which data structure is used in BFS?",
+    "options": {"A": "Stack", "B": "Queue", "C": "Heap", "D": "Tree"},
+    "answer": "B",
+    "answer_text": "Queue",
+    "explanation": "BFS (Breadth-First Search) uses a queue because it visits nodes level by level. The first node discovered is processed first, which matches FIFO (First-In, First-Out) behavior.",
+    "wrong": {
+      "Stack": "Used by DFS-style traversal, not standard BFS",
+      "Heap": "Used for priority-based algorithms such as Dijkstra's algorithm",
+      "Tree": "A hierarchical data structure, not the worklist used by BFS"
+    }
+  },
+  {
+    "id": 6,
+    "category": "coding_dsa",
+    "difficulty": "easy",
+    "keywords": ["dfs", "depth first search"],
+    "question": "Which data structure is commonly used in iterative DFS?",
+    "options": {"A": "Queue", "B": "Stack", "C": "Heap", "D": "Hash Table"},
+    "answer": "B",
+    "answer_text": "Stack",
+    "explanation": "Iterative DFS commonly uses a stack so the most recently discovered node is explored first.",
+    "wrong": {
+      "Queue": "Queue is used by BFS.",
+      "Heap": "Heap is used for priority-based retrieval.",
+      "Hash Table": "Hash tables are useful for visited sets, but not the DFS traversal worklist."
+    }
+  },
+  {
+    "id": 7,
+    "category": "coding_dsa",
+    "difficulty": "easy",
+    "keywords": ["dijkstra", "dijkstra's algorithm"],
+    "question": "Which data structure is used internally in Dijkstra's Algorithm?",
+    "options": {"A": "Queue", "B": "Stack", "C": "Priority Queue (Min Heap)", "D": "Linked List"},
+    "answer": "C",
+    "answer_text": "Priority Queue (Min Heap)",
+    "explanation": "Dijkstra's algorithm repeatedly selects the unvisited node with the smallest current distance. A priority queue implemented with a min heap helps retrieve that node efficiently.",
+    "wrong": {
+      "Queue": "Used in BFS",
+      "Stack": "Used in DFS",
+      "Linked List": "Inefficient for repeatedly finding the minimum distance node"
+    }
+  },
+  {
+    "id": 8,
+    "category": "aws",
+    "difficulty": "easy",
+    "keywords": ["aws object storage", "object storage"],
+    "question": "Which AWS service is primarily used for object storage?",
+    "options": {"A": "EC2", "B": "S3", "C": "Lambda", "D": "RDS"},
+    "answer": "B",
+    "answer_text": "S3",
+    "explanation": "Amazon S3 (Simple Storage Service) is AWS's object storage service used to store files, images, videos, backups, and other unstructured data.",
+    "wrong": {
+      "EC2": "Virtual servers",
+      "Lambda": "Serverless functions",
+      "RDS": "Relational databases"
+    }
+  }
+]
