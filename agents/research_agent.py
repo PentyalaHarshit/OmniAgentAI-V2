@@ -59,12 +59,38 @@ class ResearchAgent(BaseAgent):
             "Analyzer Agent: organized findings, gaps, and evaluation criteria.",
             "Verifier Agent: marked live/current claims as needing external verification.",
         ]
+        observation_loop = self.tot.create_observation_guided_loop(
+            self.agent_type,
+            clean_query,
+            f"Route to {selected} based on research intent '{intent}'.",
+            [
+                {
+                    "action": "Retrieve local research RAG context",
+                    "observation": f"Sources: {rag['sources']}",
+                },
+                {
+                    "action": "Select specialized research sub-agent",
+                    "observation": selected,
+                    "replan": (
+                        "Current/latest claim detected; keep answer caveated until live search is connected."
+                        if intent == "trend"
+                        else ""
+                    ),
+                },
+                {
+                    "action": "Analyze evidence and verify limitations",
+                    "observation": "Verifier marked unsupported live claims as needing external verification.",
+                },
+            ],
+            verified=intent != "trend",
+        )
 
-        return self.response(clean_query, thoughts + flow_thoughts, answer, {
+        return self.response(clean_query, thoughts + flow_thoughts + self.tot.format_observation_loop(observation_loop), answer, {
             "selected_research_agent": selected,
             "intent": intent,
             "rag": rag,
             "file_context_used": bool(file_context),
+            "observation_guided_tot_react": observation_loop,
             "pipeline": [
                 "ResearchAgent",
                 "ToT Agent",

@@ -49,6 +49,7 @@ class CodingAgent(BaseAgent):
             for step in crew_result.get("react_trace", [])
         ]
         crew_ai = crew_result.get("crew_ai", {})
+        crew_validation_trace = crew_result.get("crew_validation_trace", [])
         multi_llm = crew_result.get("multi_llm", {})
         verification = crew_result.get("verification", {})
         reasoning_mode = crew_result.get("reasoning_mode", {})
@@ -66,6 +67,21 @@ class CodingAgent(BaseAgent):
                 f"- Policy: {alphacode_search.get('policy', '')}\n"
                 "- Strategy Candidates:\n"
                 + ("\n".join(strategy_lines) if strategy_lines else "- None")
+                + "\n\n"
+            )
+        validation_trace_section = ""
+        if crew_validation_trace:
+            validation_lines = []
+            for item in crew_validation_trace:
+                analyzer = item.get("analyzer", {})
+                validator = item.get("validator", {})
+                validation_lines.append(
+                    f"- Round {item.get('round')}: Analyzer={analyzer.get('failure_type', 'unknown')} | "
+                    f"Validator={validator.get('decision', 'unknown')}"
+                )
+            validation_trace_section = (
+                "CrewAI Failed Observation Validation:\n"
+                + "\n".join(validation_lines)
                 + "\n\n"
             )
         return (
@@ -88,7 +104,8 @@ class CodingAgent(BaseAgent):
             "ReAct Trace:\n"
             + "\n".join(react_lines)
             + "\n\n"
-            "CrewAI Review:\n"
+            + validation_trace_section
+            + "CrewAI Review:\n"
             f"- Evaluator Agent: {crew_ai.get('evaluator', {}).get('notes', 'n/a')}\n"
             f"- Analyzer Agent: {crew_ai.get('analyzer', {}).get('time_complexity', 'n/a')} time, "
             f"{crew_ai.get('analyzer', {}).get('memory_complexity', 'n/a')} memory\n"

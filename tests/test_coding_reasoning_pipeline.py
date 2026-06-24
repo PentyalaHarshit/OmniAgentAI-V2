@@ -28,6 +28,25 @@ def test_dijkstra_coding_agent_returns_reasoned_algorithm_pipeline():
     assert "98%" in answer
 
 
+def test_negative_edge_shortest_path_replans_to_bellman_ford():
+    agent = CodingAgent()
+
+    result = agent.run("Find shortest path in a weighted graph with a negative edge.")
+    answer = result["answer"]
+    crew = result["extra"]["crew_result"]
+
+    assert crew["selected_algorithm"] == "bellman_ford"
+    assert crew["selected_algorithm_label"] == "Bellman-Ford"
+    assert crew["verification"]["passed"] is True
+    assert crew["self_correct"][0]["action"] == "retry_with_alternative_algorithm"
+    assert crew["crew_validation_trace"][0]["analyzer"]["failure_type"] == "strategy_mismatch"
+    assert crew["crew_validation_trace"][0]["validator"]["decision"] == "reopen_tot"
+    assert "CrewAI Failed Observation Validation:" in answer
+    assert "Validator=reopen_tot" in answer
+    assert "Bellman-Ford" in answer
+    assert "O(VE)" in answer
+
+
 def test_segment_tree_query_returns_coding_pipeline():
     agent = CodingAgent()
 

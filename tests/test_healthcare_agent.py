@@ -12,6 +12,8 @@ def test_symptom_query_asks_first_triage_question_without_hospital_first():
 
     assert result["extra"]["status"] == "asking_question"
     assert result["extra"]["slot_filling"] is True
+    assert "observation_guided_tot_react" in result["extra"]
+    assert any("Observation-Guided ToT-ReAct" in thought for thought in result["thoughts"])
     assert "Which hospital would you like to visit?" not in answer
     assert "What is your age?" in answer
     assert result["extra"]["question"] == "What is your age?"

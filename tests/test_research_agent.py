@@ -6,6 +6,8 @@ def test_research_agent_general_agentic_rag_report():
     result = ResearchAgent().run("Research Agentic RAG architectures.")
 
     assert result["extra"]["selected_research_agent"] == "ResearchAgent"
+    assert "observation_guided_tot_react" in result["extra"]
+    assert any("Observation-Guided ToT-ReAct" in thought for thought in result["thoughts"])
     assert "Research Report" in result["answer"]
     assert "Research Gaps" in result["answer"]
     assert "Verifier Agent" in result["answer"]

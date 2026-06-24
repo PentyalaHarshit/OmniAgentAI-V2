@@ -13,6 +13,15 @@ class AlgorithmStore:
                 "time_complexity": "O((V + E) log V)",
                 "memory_complexity": "O(V + E)",
             },
+            "bellman_ford": {
+                "name": "Bellman-Ford",
+                "keywords": ["bellman ford", "negative edge", "negative weight", "negative cycle", "shortest path"],
+                "tags": ["graph", "shortest-path", "negative-weights"],
+                "category": "graph",
+                "difficulty": "intermediate",
+                "time_complexity": "O(VE)",
+                "memory_complexity": "O(V)",
+            },
             "zero_one_bfs": {
                 "name": "0-1 BFS",
                 "keywords": ["0-1 bfs", "zero one bfs", "weight 0 1", "deque shortest path"],

@@ -114,7 +114,26 @@ Candidate strategies:
 - Floyd-Warshall: high score for all-pairs shortest paths on smaller graphs.
 - BFS: high score for unweighted graphs.
 
-The ToT planner scores candidate strategies and selects the best one based on constraints, expected complexity, input format, and validation evidence. The selected strategy is then passed to the action layer for code generation, compilation, tests, and review.
+The ToT planner scores candidate strategies and selects the best one based on constraints, expected complexity, input format, and validation evidence. The selected strategy is then passed to the action layer for code generation, compilation, tests, and review. If the action layer returns contradictory evidence, the system can reopen the strategy search instead of remaining committed to the first choice.
+
+### 6.3 Observation-Guided Tree-of-Thought ReAct Loop
+
+OmniAgentAI V2 combines Tree-of-Thought planning with ReAct tool use through an Observation-Guided Tree-of-Thought ReAct loop. The system generates and scores candidate strategies, executes an external action, observes the result, and then builds a revised thought tree conditioned on that observation. This loop repeats until verification succeeds or no useful retry remains.
+
+The loop can be summarized as:
+
+Query
+-> Thought Tree
+-> Strategy Selection
+-> Action
+-> Observation
+-> Observation-Guided Replanning
+-> New Thought Tree
+-> New Action
+-> Verification
+-> Final Answer
+
+For coding tasks, this allows the system to change algorithms after evidence invalidates the initial plan. For example, a shortest-path query may initially select heap-optimized Dijkstra. If validation observes a negative edge constraint, the next thought tree raises Bellman-Ford above Dijkstra, regenerates the solution, and verifies it with tests.
 
 ## 7. Action Layer
 
@@ -145,7 +164,7 @@ This prevents the system from returning unsupported answers such as "I guess" or
 
 ## 8. ReAct Cycles
 
-ReAct cycles allow the system to reason, act, observe, and decide the next step. A general loop is:
+ReAct cycles allow the system to reason, act, observe, and decide the next step. In OmniAgentAI V2, ReAct observations can feed back into Tree-of-Thought planning, so the next reasoning step may revise the selected strategy rather than only continue the original plan. A general loop is:
 
 Reason: identify missing evidence.
 Action: call web search, RAG, MCP tool, or database.
@@ -153,6 +172,9 @@ Observation: collect retrieved result.
 Reason: decide whether evidence is enough.
 Action: refine query, call another tool, or proceed.
 Observation: collect additional facts.
+New Thought Tree: update candidate strategies using the observation.
+Action: retry with the revised strategy or proceed.
+Observation: collect new results.
 Final: synthesize and verify.
 
 Multiple ReAct cycles are useful when a query has more than one requirement. For example, "I have fever and cough" should not immediately answer with a diagnosis. It should ask follow-up questions, retrieve medical knowledge, recommend the right specialist, and optionally book an appointment.
@@ -219,7 +241,75 @@ Draft answer
 -> If invalid: self-correct or return to action/router
 -> Repeat until validated or safe fallback
 
-## 13. Memory and Uploaded File Support
+## 13. Computational Complexity and Objective Function
+
+### 13.1 Overall Computational Complexity
+
+The overall computational complexity of OmniAgentAI V2 can be approximated as:
+
+```text
+O(n + k log N + r(b^d) + m)
+```
+
+where `n` represents the number of available agents, `k` represents the number of retrieved chunks, `N` represents the total number of indexed documents in the vector database, `r` represents the number of recursive ReAct retry iterations, `b` represents the Tree-of-Thought branching factor, `d` represents the reasoning depth, and `m` represents the number of verification operations.
+
+The terms can be interpreted as:
+
+- Routing cost: `O(n)`.
+- Retrieval cost: `O(k log N)`.
+- Tree-of-Thought reasoning cost: `O(b^d)`.
+- Recursive retry cost: `O(r * b^d)`.
+- Verification cost: `O(m)`.
+
+The term `r(b^d)` dominates the complexity because recursive Tree-of-Thought reasoning may expand multiple branches across multiple ReAct iterations. Therefore, practical implementations should control the branching factor, search depth, retry limit, and verifier budget to reduce computational cost while preserving reliability.
+
+### 13.2 Multi-LLM Consensus Model
+
+Let:
+
+```text
+M = {M_1, M_2, ..., M_p}
+```
+
+represent a set of `p` language models available to the system. Each model produces a candidate response for a query `Q`:
+
+```text
+Y_i = M_i(Q)
+```
+
+The consensus response is selected as:
+
+```text
+Y* = argmax_Yi Conf(Y_i)
+```
+
+where `Conf(Y_i)` is the confidence score assigned after validation, which may include factual support, tool consistency, test results, safety checks, and agreement with other models.
+
+### 13.3 Overall Objective Function
+
+The final answer is selected using a combined score:
+
+```text
+FinalScore = lambda_1 R + lambda_2 T + lambda_3 V + lambda_4 M
+```
+
+where:
+
+- `R` is retrieval quality.
+- `T` is reasoning quality.
+- `V` is verification score.
+- `M` is multi-LLM consensus score.
+- `lambda_1 + lambda_2 + lambda_3 + lambda_4 = 1`.
+
+The answer with the highest final score is returned to the user:
+
+```text
+Y_final = argmax_Y FinalScore(Y)
+```
+
+This objective function reflects the OmniAgentAI V2 design goal: an answer should not be selected only because it is fluent, but because it is well-grounded, well-reasoned, verified, and supported by model consensus when multiple models are available.
+
+## 14. Memory and Uploaded File Support
 
 The MemoryAgent stores prior user queries, assistant answers, and conversation context. It supports follow-up queries such as:
 
@@ -231,7 +321,7 @@ The system resolves "more details" to the prior topic and generates an expanded 
 
 The upload layer supports PDFs, DOCX files, spreadsheets, and other documents. Uploaded documents can be chunked, embedded, indexed, and retrieved through normal RAG. This allows the system to answer questions using user-provided files rather than only web data or built-in facts.
 
-## 14. Neuro-Symbolic Design
+## 15. Neuro-Symbolic Design
 
 OmniAgentAI is neuro-symbolic because it combines:
 
@@ -257,7 +347,7 @@ Symbolic components:
 
 This hybrid design aims to use the flexibility of neural models while preserving the reliability of symbolic execution and validation.
 
-## 15. Example: General Knowledge Query
+## 16. Example: General Knowledge Query
 
 Query: "Why did the Roman Empire fall?"
 
@@ -277,7 +367,7 @@ Expected OmniAgentAI flow:
 7. Self-correction removes unsupported claims.
 8. Final answer explains political instability, economic pressure, military problems, administrative division, and invasions.
 
-## 16. Example: Coding Query
+## 17. Example: Coding Query
 
 Query: "Find the shortest distance in a weighted graph."
 
@@ -285,30 +375,32 @@ Expected CodingAgent flow:
 
 1. Query classifier detects coding/algorithm task.
 2. ToT planner generates candidate algorithms.
-3. Candidate scoring selects Dijkstra if edge weights are non-negative.
+3. Candidate scoring initially selects heap-optimized Dijkstra for weighted shortest paths.
 4. RAG retrieves algorithm notes and C++ templates.
 5. Code generator creates implementation.
 6. Compiler checks syntax.
 7. Unit tests validate behavior.
-8. Complexity analyzer reports time and memory.
-9. CrewAI validator checks final answer.
-10. Self-correction retries if tests fail.
+8. If tests or constraints reveal negative edges, the Observation-Guided ToT-ReAct loop rebuilds the thought tree and selects Bellman-Ford.
+9. The regenerated solution is compiled and tested again.
+10. Complexity analyzer reports time and memory.
+11. CrewAI validator checks final answer.
+12. Self-correction retries if verification still fails.
 
-## 17. Research Contributions
+## 18. Research Contributions
 
 The proposed architecture contributes:
 
 1. A tree-structured multi-agent router that delegates tasks to specialized parent and leaf agents.
 2. A hybrid reasoning policy using Chain-of-Thought style staged reasoning for simpler agents and Tree-of-Thought planning for strategy-search agents.
 3. An action layer that unifies MCP, Web RAG, normal RAG, domain tools, APIs, databases, and deterministic validators.
-4. A ReAct-based loop for multi-step tasks requiring observation and tool interaction.
+4. An Observation-Guided Tree-of-Thought ReAct loop for multi-step tasks requiring tool interaction, observation-conditioned replanning, and strategy correction.
 5. CrewAI-style multi-agent evaluation for hallucination reduction.
 6. Multi-LLM collaboration for speed, diversity, and robustness.
 7. A neuro-symbolic verification layer combining neural synthesis with symbolic rules and deterministic checks.
 8. Memory and document-upload support for contextual continuity.
 9. A roadmap toward autonomous research systems, theorem proving, multimodal reasoning, and algorithm discovery.
 
-## 18. Evaluation Plan
+## 19. Evaluation Plan
 
 OmniAgentAI can be evaluated across several dimensions:
 
@@ -330,7 +422,7 @@ Suggested datasets:
 - Healthcare triage simulations with safety labels.
 - Uploaded-document QA tests.
 
-## 19. Future Work
+## 20. Future Work
 
 Future OmniAgentAI work includes:
 
@@ -343,7 +435,7 @@ Future OmniAgentAI work includes:
 - Stronger MCP security auditing and sandboxing.
 - Better verifier agents for cross-domain factuality and safety.
 
-## 20. Conclusion
+## 21. Conclusion
 
 OmniAgentAI proposes a practical and extensible architecture for agentic AI systems. Instead of relying on one LLM response, it combines direct model answering, router-based delegation, specialized agents, Tree-of-Thought planning, Chain-of-Thought style staged reasoning, ReAct tool use, RAG, MCP, CrewAI evaluation, multi-LLM collaboration, memory, uploaded-file retrieval, verification, and self-correction. The result is a neuro-symbolic design intended to improve correctness, reduce hallucination, support complex workflows, and prepare for future autonomous research systems.
 

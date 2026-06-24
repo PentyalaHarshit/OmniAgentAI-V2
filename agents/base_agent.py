@@ -67,12 +67,33 @@ class BaseAgent:
         self.conversation_state.clear(session_id)
 
         crew_result = self.crew.run(query, self.agent_type, extracted, self.rag_category)
+        observation_loop = self.tot.create_observation_guided_loop(
+            self.agent_type,
+            query,
+            "Use RAG, availability tools, pricing, recommendation, and safety verification.",
+            [
+                {
+                    "action": f"Retrieve {self.rag_category} RAG context",
+                    "observation": f"Sources: {crew_result['rag']['sources']}",
+                },
+                {
+                    "action": "Check availability through provider or mock booking API",
+                    "observation": f"Available: {crew_result['availability'].get('available')}",
+                },
+                {
+                    "action": "Verify recommendation and safety constraints",
+                    "observation": crew_result["self_check"].get("warning", "No warning"),
+                },
+            ],
+            verified=bool(crew_result["availability"].get("available")),
+        )
         crew_thoughts = [s["thought"] for s in crew_result["crew_steps"]]
         answer = self.build_answer(extracted, crew_result)
-        return self.response(query, thoughts + crew_thoughts, answer, {
+        return self.response(query, thoughts + crew_thoughts + self.tot.format_observation_loop(observation_loop), answer, {
             "slot_filling": False,
             "extracted": extracted,
-            "crew_result": crew_result
+            "crew_result": crew_result,
+            "observation_guided_tot_react": observation_loop,
         })
 
     def build_answer(self, extracted, crew_result):

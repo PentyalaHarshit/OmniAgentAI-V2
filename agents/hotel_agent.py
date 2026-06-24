@@ -61,10 +61,31 @@ class HotelAgent(BaseAgent):
             "Book now?",
             "yes/no",
         ])
+        observation_loop = self.tot.create_observation_guided_loop(
+            self.agent_type,
+            query,
+            "Search hotels, filter by budget, recommend option, and wait for confirmation.",
+            [
+                {
+                    "action": "Search local demo hotel inventory",
+                    "observation": f"{len(filtered)} hotels matched budget {budget}",
+                },
+                {
+                    "action": "Select recommendation",
+                    "observation": recommended["name"],
+                },
+                {
+                    "action": "Run booking safety check",
+                    "observation": "No booking or payment without explicit confirmation.",
+                },
+            ],
+            verified=True,
+        )
         return self.response(query, [
             "Hotel Search API: searched local demo hotel inventory.",
             "Recommendation Agent: selected the best hotel under budget.",
             "Booking Agent: waiting for explicit booking confirmation.",
+            *self.tot.format_observation_loop(observation_loop),
         ], answer, {
             "selected_booking_agent": "HotelBookingAgent",
             "city": city,
@@ -72,6 +93,7 @@ class HotelAgent(BaseAgent):
             "hotels": filtered,
             "recommendation": recommended,
             "safety_layer_skip_actions": ["book", "pay"],
+            "observation_guided_tot_react": observation_loop,
         })
 
     @staticmethod

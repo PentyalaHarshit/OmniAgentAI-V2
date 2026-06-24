@@ -49,11 +49,32 @@ class CodingCrew:
         compile_result = self.compile_or_check(code, language)
         test_result = self.run_test(query, code, language, selected_algorithm)
         self_correct = []
+        crew_validation_trace = []
 
         for round_no in range(1, MAX_SELF_CORRECT_ROUNDS + 1):
             verification = self.verify_solution(selected_candidate, compile_result, test_result, code)
             if verification["passed"]:
                 break
+            failure_analysis = self.analyze_failed_observation(
+                selected_candidate,
+                compile_result,
+                test_result,
+                verification,
+            )
+            validation_decision = self.validate_failed_observation(failure_analysis)
+            crew_validation_trace.append({
+                "round": round_no,
+                "analyzer": failure_analysis,
+                "validator": validation_decision,
+            })
+            if not validation_decision["reopen_tot"]:
+                break
+            algorithm_candidates = self.rethink_candidates_from_observation(
+                algorithm_candidates,
+                selected_candidate,
+                test_result,
+                validation_decision,
+            )
             retry_candidate = self.pick_retry_candidate(algorithm_candidates, selected_candidate)
             if not retry_candidate:
                 break
@@ -66,6 +87,8 @@ class CodingCrew:
                 "round": round_no,
                 "action": "retry_with_alternative_algorithm",
                 "algorithm": selected_algorithm,
+                "analyzer_decision": failure_analysis["failure_type"],
+                "validator_decision": validation_decision["decision"],
                 "compile": compile_result["status"],
                 "tests": test_result["status"],
             })
@@ -77,7 +100,8 @@ class CodingCrew:
         crew_steps = [
             {"thought": "CoT Agent: identify algorithmic intent", "output": selected_candidate["reason"]},
             {"thought": "ToT Agent: compare candidate approaches", "output": self.format_candidates(algorithm_candidates)},
-            {"thought": "ReAct Agent: retrieve knowledge, generate, compile, test", "output": self.build_react_trace(selected_algorithm, compile_result, test_result)},
+            {"thought": "CrewAI Analyzer Agent: inspect failed observations", "output": crew_validation_trace},
+            {"thought": "Observation-Guided ToT-ReAct Agent: replan after tool feedback", "output": self.build_react_trace(selected_algorithm, compile_result, test_result, self_correct)},
             {"thought": "Reflection Agent: verify correctness gates", "output": verification},
             {"thought": "Reasoning Aggregator: choose best reasoning", "output": selected_candidate["name"]},
         ]
@@ -93,13 +117,14 @@ class CodingCrew:
             "rag": rag_result,
             "advanced_rag": algorithm_rag_blocks,
             "alphacode_search": alphacode_search,
-            "react_trace": self.build_react_trace(selected_algorithm, compile_result, test_result),
+            "react_trace": self.build_react_trace(selected_algorithm, compile_result, test_result, self_correct),
             "crew_ai": self.run_crew_ai_review(selected_algorithm, verification),
             "multi_llm": self.collect_multi_llm_improvements(selected_algorithm),
             "verification": verification,
             "compile_result": compile_result,
             "test_result": test_result,
             "self_correct": self_correct,
+            "crew_validation_trace": crew_validation_trace,
             "reviewer": self.review_complexity(selected_candidate),
             "code": code,
             "crew_steps": crew_steps,
@@ -621,7 +646,10 @@ DB_NAME=appdb
             add("Thought 2", "dijkstra", "Heap Optimized Dijkstra", 95,
                 "Adjacency list plus priority queue is the usual optimized implementation.",
                 "O((V + E) log V)", "O(V + E)")
-            add("Thought 3", "zero_one_bfs", "0-1 BFS", 70,
+            add("Thought 3", "bellman_ford", "Bellman-Ford", 82,
+                "Handles single-source shortest paths when negative edge weights may appear.",
+                "O(VE)", "O(V)")
+            add("Thought 4", "zero_one_bfs", "0-1 BFS", 70,
                 "Only applies when all edge weights are 0 or 1.",
                 "O(V + E)", "O(V + E)")
 
@@ -677,13 +705,89 @@ DB_NAME=appdb
         return None
 
     @staticmethod
+    @staticmethod
+    def analyze_failed_observation(selected_candidate: dict, compile_result: dict, test_result: dict, verification: dict):
+        test_output = test_result.get("output", "")
+        compile_output = compile_result.get("output", "")
+        if test_result.get("status") == "failed" and "negative edge" in test_output.lower():
+            failure_type = "strategy_mismatch"
+            recommendation = "Reopen ToT and prefer an algorithm that supports negative edge weights."
+        elif test_result.get("status") == "failed":
+            failure_type = "test_failure"
+            recommendation = "Reopen ToT or regenerate using a safer candidate."
+        elif compile_result.get("status") == "failed":
+            failure_type = "compile_failure"
+            recommendation = "Regenerate implementation before changing strategy."
+        else:
+            failure_type = "verification_failure"
+            recommendation = "Use verifier feedback to decide whether strategy search should continue."
+
+        return {
+            "agent": "CrewAI Analyzer Agent",
+            "algorithm": selected_candidate.get("algorithm"),
+            "failure_type": failure_type,
+            "compile_observation": compile_output,
+            "test_observation": test_output,
+            "verification_reason": verification.get("reason", ""),
+            "recommendation": recommendation,
+        }
+
+    @staticmethod
+    def validate_failed_observation(failure_analysis: dict):
+        failure_type = failure_analysis.get("failure_type")
+        reopen_tot = failure_type in {"strategy_mismatch", "test_failure"}
+        decision = "reopen_tot" if reopen_tot else "do_not_reopen_tot"
+        return {
+            "agent": "CrewAI Validator Agent",
+            "decision": decision,
+            "reopen_tot": reopen_tot,
+            "reason": (
+                "Test observation failed validation, so the planner should generate a new ToT strategy tree."
+                if reopen_tot
+                else "Failure does not yet prove the selected strategy is wrong."
+            ),
+        }
+
+    @staticmethod
+    def rethink_candidates_from_observation(candidates: list[dict], selected_candidate: dict, test_result: dict, validation_decision: dict | None = None):
+        if validation_decision and not validation_decision.get("reopen_tot"):
+            return candidates
+        observation = test_result.get("output", "").lower()
+        if selected_candidate.get("algorithm") != "dijkstra" or "negative edge" not in observation:
+            return candidates
+
+        revised = []
+        found_bellman = False
+        for candidate in candidates:
+            item = dict(candidate)
+            if item.get("algorithm") == "bellman_ford":
+                item["score"] = max(item.get("score", 0), selected_candidate.get("score", 0) + 5)
+                item["reason"] = "Observation showed a negative edge case, so Bellman-Ford is safer than Dijkstra."
+                found_bellman = True
+            revised.append(item)
+
+        if not found_bellman:
+            revised.append({
+                "thought": f"Thought {len(revised) + 1}",
+                "name": "Bellman-Ford",
+                "algorithm": "bellman_ford",
+                "score": selected_candidate.get("score", 0) + 5,
+                "reason": "Observation showed a negative edge case, so Bellman-Ford is safer than Dijkstra.",
+                "time_complexity": "O(VE)",
+                "memory_complexity": "O(V)",
+            })
+
+        return sorted(revised, key=lambda item: item["score"], reverse=True)
+
+    @staticmethod
     def format_candidates(candidates: list[dict]):
         return "\n".join(f"{item['name']}: {item['score']}" for item in candidates)
 
     @staticmethod
-    def build_react_trace(selected_algorithm: str, compile_result: dict, test_result: dict):
+    def build_react_trace(selected_algorithm: str, compile_result: dict, test_result: dict, self_correct: list[dict] | None = None):
         labels = {
             "dijkstra": "Need shortest path",
+            "bellman_ford": "Need shortest path with possible negative edges",
             "zero_one_bfs": "Need 0-1 shortest path",
             "segment_tree": "Need range query data structure",
             "fenwick_tree": "Need prefix-sum data structure",
@@ -692,12 +796,23 @@ DB_NAME=appdb
             "centroid_decomposition": "Need decomposed tree query structure",
             "dsu_on_tree": "Need subtree aggregation",
         }
-        return [
+        trace = [
             {"reason": labels.get(selected_algorithm, "Need algorithm implementation"), "action": "Retrieve algorithms.txt", "observation": f"Selected {selected_algorithm}"},
             {"reason": "Need working implementation", "action": "Generate code", "observation": "Code generated"},
             {"reason": "Need correctness", "action": "Compile", "observation": compile_result["output"]},
             {"reason": "Need validation", "action": "Run test cases", "observation": test_result["output"]},
         ]
+        for retry in self_correct or []:
+            trace.insert(1, {
+                "reason": "CrewAI Validator accepted failed observation",
+                "action": "Run Analyzer + Validator, then generate new ToT candidates",
+                "observation": (
+                    f"Round {retry['round']} {retry['validator_decision']} after "
+                    f"{retry['analyzer_decision']}; selected {retry['algorithm']} "
+                    f"with {retry['tests']} tests"
+                ),
+            })
+        return trace
 
     @staticmethod
     def run_crew_ai_review(selected_algorithm: str, verification: dict):
@@ -816,6 +931,37 @@ while pq:
 
 print(*[-1 if dist[i] == INF else dist[i] for i in range(1, n + 1)])
 '''
+        if algorithm == "bellman_ford":
+            return '''n, m, src = map(int, input().split())
+edges = []
+for _ in range(m):
+    u, v, w = map(int, input().split())
+    edges.append((u, v, w))
+
+INF = 10**30
+dist = [INF] * (n + 1)
+dist[src] = 0
+
+for _ in range(n - 1):
+    changed = False
+    for u, v, w in edges:
+        if dist[u] != INF and dist[u] + w < dist[v]:
+            dist[v] = dist[u] + w
+            changed = True
+    if not changed:
+        break
+
+has_negative_cycle = False
+for u, v, w in edges:
+    if dist[u] != INF and dist[u] + w < dist[v]:
+        has_negative_cycle = True
+        break
+
+if has_negative_cycle:
+    print("NEGATIVE CYCLE")
+else:
+    print(*[-1 if dist[i] == INF else dist[i] for i in range(1, n + 1)])
+'''
         if algorithm == "segment_tree":
             return '''class SegmentTree:
     def __init__(self, values):
@@ -905,6 +1051,61 @@ int main() {
                 dist[next] = dist[node] + weight;
                 pq.push({dist[next], next});
             }
+        }
+    }
+
+    for (int i = 1; i <= n; i++) {
+        if (dist[i] == INF) cout << -1;
+        else cout << dist[i];
+        cout << (i == n ? '\n' : ' ');
+    }
+    return 0;
+}
+'''
+        if algorithm == "bellman_ford":
+            return r'''#include <bits/stdc++.h>
+using namespace std;
+
+struct Edge {
+    int from, to;
+    long long weight;
+};
+
+int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
+    int n, m, src;
+    cin >> n >> m >> src;
+    vector<Edge> edges;
+    edges.reserve(m);
+    for (int i = 0; i < m; i++) {
+        int u, v;
+        long long w;
+        cin >> u >> v >> w;
+        edges.push_back({u, v, w});
+    }
+
+    const long long INF = (1LL << 62);
+    vector<long long> dist(n + 1, INF);
+    dist[src] = 0;
+
+    for (int i = 1; i <= n - 1; i++) {
+        bool changed = false;
+        for (const Edge& edge : edges) {
+            if (dist[edge.from] == INF) continue;
+            if (dist[edge.from] + edge.weight < dist[edge.to]) {
+                dist[edge.to] = dist[edge.from] + edge.weight;
+                changed = true;
+            }
+        }
+        if (!changed) break;
+    }
+
+    for (const Edge& edge : edges) {
+        if (dist[edge.from] != INF && dist[edge.from] + edge.weight < dist[edge.to]) {
+            cout << "NEGATIVE CYCLE\n";
+            return 0;
         }
     }
 
@@ -1192,6 +1393,11 @@ int main() {
             return {"status": "failed", "output": result.stderr.strip() or result.stdout.strip()}
 
     def run_test(self, query: str, code: str, language: str, algorithm: str):
+        if algorithm == "dijkstra" and "negative" in query.lower():
+            return {
+                "status": "failed",
+                "output": "Negative edge observed in requested constraints; Dijkstra is not suitable.",
+            }
         cases = self.expected_tests(algorithm)
         if not cases:
             return {"status": "failed", "output": "No local tests available for selected algorithm."}
@@ -1241,6 +1447,10 @@ int main() {
             "dijkstra": [{
                 "input": "5 6 1\n1 2 2\n1 3 4\n2 3 1\n2 4 7\n3 5 3\n4 5 1\n",
                 "expected": "0 2 3 7 6",
+            }],
+            "bellman_ford": [{
+                "input": "5 6 1\n1 2 4\n1 3 2\n3 2 -3\n2 4 2\n3 5 4\n5 4 -1\n",
+                "expected": "0 -1 2 1 6",
             }],
             "segment_tree": [{
                 "input": "5 4\n1 2 3 4 5\nsum 1 5\nset 3 10\nsum 2 4\nsum 3 3\n",

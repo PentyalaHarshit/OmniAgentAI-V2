@@ -268,6 +268,9 @@ class AgentRouter:
         if self.is_learning_query(q):
             return "learning", self.learning_agent
 
+        if any(k in q for k in ["tourist attractions", "top tourist", "top places", "attractions in", "places to visit"]):
+            return "local_discovery", self.local_discovery_agent
+
         if self.is_general_agent_query(q):
             if self._is_country_query(q):
                 return "country", self.country_agent
@@ -352,6 +355,9 @@ class AgentRouter:
             return "vacation_package", self.vacation_package_agent
         if any(k in q for k in ["travel", "trip", "itinerary", "tour", "destination"]):
             return "travel", self.travel_agent
+
+        if any(k in q for k in ["tourist attractions", "top tourist", "top places", "attractions in", "places to visit"]):
+            return "local_discovery", self.local_discovery_agent
 
         if self.is_web_query(q):
             return "web", self.web_agent

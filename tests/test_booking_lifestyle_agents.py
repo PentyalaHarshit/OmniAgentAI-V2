@@ -12,6 +12,8 @@ from agents.vacation_package_agent import VacationPackageAgent
 def test_hotel_booking_agent_output():
     result = HotelAgent().run("Book a hotel in New York for 3 nights under $200 per night.")
 
+    assert "observation_guided_tot_react" in result["extra"]
+    assert any("Observation-Guided ToT-ReAct" in thought for thought in result["thoughts"])
     assert "HotelBookingAgent / hotel" in result["answer"]
     assert "Top Hotels" in result["answer"]
     assert "Marriott Times Square" in result["answer"]
@@ -22,6 +24,7 @@ def test_hotel_booking_agent_output():
 def test_restaurant_agent_output():
     result = RestaurantAgent().run("Find Indian restaurants near me.")
 
+    assert "observation_guided_tot_react" in result["extra"]
     assert "RestaurantAgent / restaurant" in result["answer"]
     assert "Spice Grill" in result["answer"]
     assert "Available Table" in result["answer"]

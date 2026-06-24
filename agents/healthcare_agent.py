@@ -113,23 +113,56 @@ class HealthcareAgent(BaseAgent):
         self.conversation_state.clear(session_id)
         emergency_response = self.emergency_response(query, patient_info)
         if emergency_response:
-            return self.response(query, thoughts + ["Emergency Checker: high-risk red flag detected"], emergency_response["answer"], {
+            observation_loop = self.build_healthcare_observation_loop(
+                query,
+                "Emergency response path",
+                [
+                    {
+                        "action": "Check red-flag symptoms",
+                        "observation": f"Risk: {emergency_response['analysis']['risk']}",
+                        "replan": "Escalate from normal triage to emergency guidance.",
+                    },
+                ],
+                verified=True,
+            )
+            return self.response(query, thoughts + ["Emergency Checker: high-risk red flag detected"] + self.tot.format_observation_loop(observation_loop), emergency_response["answer"], {
                 "status": "high_risk",
                 "slot_filling": False,
                 "patient_info": patient_info,
                 "analysis": emergency_response["analysis"],
+                "observation_guided_tot_react": observation_loop,
             })
 
         crew_result = self.crew.run(query, extracted, include_doctors=booking_intent)
+        observation_loop = self.build_healthcare_observation_loop(
+            query,
+            "Analyze symptoms, retrieve healthcare evidence, assess risk, and recommend care.",
+            [
+                {
+                    "action": "Run healthcare crew analysis",
+                    "observation": f"Risk: {crew_result['analysis'].get('risk')}",
+                },
+                {
+                    "action": "Retrieve healthcare RAG and safety checks",
+                    "observation": crew_result["self_check"].get("warning", "Medical safety disclaimer applied."),
+                },
+                {
+                    "action": "Recommend specialty or doctor when requested",
+                    "observation": crew_result.get("specialty", "No specialty available"),
+                },
+            ],
+            verified=True,
+        )
         crew_thoughts = [s["thought"] for s in crew_result["crew_steps"]]
         answer = self.build_healthcare_answer(extracted, crew_result, booking_intent, patient_info)
 
-        return self.response(query, thoughts + crew_thoughts, answer, {
+        return self.response(query, thoughts + crew_thoughts + self.tot.format_observation_loop(observation_loop), answer, {
             "status": "analyzed",
             "slot_filling": False,
             "extracted": extracted,
             "patient_info": patient_info,
-            "crew_result": crew_result
+            "crew_result": crew_result,
+            "observation_guided_tot_react": observation_loop,
         })
 
     def start_triage(self, query: str, thoughts: list[str], extracted: dict, patient_info: dict, session_id: str):
@@ -223,7 +256,19 @@ class HealthcareAgent(BaseAgent):
             f"{question}\n\n"
             "Safety: This is not a medical diagnosis. Please consult a licensed medical professional."
         )
-        return self.response(query, thoughts + [f"Triage Question Agent: ask {self.required_questions[index][0]}"], answer, {
+        observation_loop = self.build_healthcare_observation_loop(
+            query,
+            "Collect missing triage evidence before medical analysis.",
+            [
+                {
+                    "action": f"Ask triage question for {self.required_questions[index][0]}",
+                    "observation": question,
+                    "replan": "Wait for user observation before selecting analysis path.",
+                },
+            ],
+            verified=False,
+        )
+        return self.response(query, thoughts + [f"Triage Question Agent: ask {self.required_questions[index][0]}"] + self.tot.format_observation_loop(observation_loop), answer, {
             "status": "asking_question",
             "validation_status": "invalid" if validation_error else "pending",
             "slot_filling": True,
@@ -231,6 +276,7 @@ class HealthcareAgent(BaseAgent):
             "session": state,
             "missing_fields": state.get("missing_fields", []),
             "patient_info": state.get("answers", {}),
+            "observation_guided_tot_react": observation_loop,
         })
 
     def validate_triage_answer(self, field: str, value: str):
@@ -331,7 +377,26 @@ class HealthcareAgent(BaseAgent):
             "Doctor Recommendation Agent: showed doctor information and requested booking confirmation.",
             "Safety Confirmation: added non-diagnosis disclaimer.",
         ]
-        return self.response(symptoms, thoughts + flow_thoughts, answer, {
+        observation_loop = self.build_healthcare_observation_loop(
+            symptoms,
+            "Use completed triage observations to select risk, evidence, and care path.",
+            [
+                {
+                    "action": "Score possible conditions and risk",
+                    "observation": f"Risk: {result['analysis']['risk']}",
+                },
+                {
+                    "action": "Retrieve medical context and explain factors",
+                    "observation": ", ".join(result["rag_evidence"]["sources_used"]),
+                },
+                {
+                    "action": "Recommend doctor and ask before booking",
+                    "observation": result["recommended_doctor"]["doctor_name"],
+                },
+            ],
+            verified=True,
+        )
+        return self.response(symptoms, thoughts + flow_thoughts + self.tot.format_observation_loop(observation_loop), answer, {
             "status": "analysis_completed",
             "slot_filling": False,
             "symptoms": symptoms,
@@ -342,7 +407,17 @@ class HealthcareAgent(BaseAgent):
             "recommended_doctor": doctor,
             "appointment": result["appointment"],
             "safety": result["safety"],
+            "observation_guided_tot_react": observation_loop,
         })
+
+    def build_healthcare_observation_loop(self, query: str, strategy: str, actions: list[dict], verified: bool):
+        return self.tot.create_observation_guided_loop(
+            self.agent_type,
+            query,
+            strategy,
+            actions,
+            verified=verified,
+        )
 
     def final_analysis(self, session: dict):
         answers = self.normalize_patient_info(session.get("answers", {}))

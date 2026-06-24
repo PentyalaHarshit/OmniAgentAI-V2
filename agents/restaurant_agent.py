@@ -22,11 +22,33 @@ class RestaurantAgent(BaseAgent):
             "Reserve table?",
             "yes/no",
         ])
+        observation_loop = self.tot.create_observation_guided_loop(
+            self.agent_type,
+            query,
+            "Search restaurants, observe slots, and wait for reservation confirmation.",
+            [
+                {
+                    "action": "Search local restaurant inventory",
+                    "observation": f"{len(restaurants)} restaurants found",
+                },
+                {
+                    "action": "Find available table slots",
+                    "observation": ", ".join(slots),
+                },
+                {
+                    "action": "Run reservation safety check",
+                    "observation": "No reservation without explicit confirmation.",
+                },
+            ],
+            verified=True,
+        )
         return self.response(query, [
             "Restaurant Search Agent: searched local restaurant inventory.",
             "Reservation Agent: found available table slots.",
+            *self.tot.format_observation_loop(observation_loop),
         ], answer, {
             "restaurants": restaurants,
             "available_slots": slots,
             "safety_layer_skip_actions": ["book"],
+            "observation_guided_tot_react": observation_loop,
         })
