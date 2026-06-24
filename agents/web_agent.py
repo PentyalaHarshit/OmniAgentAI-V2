@@ -1,6 +1,7 @@
 import datetime as _dt
 import hashlib
 import logging
+import os
 import re
 import uuid
 from typing import Any
@@ -53,12 +54,17 @@ class WebSummaryCache:
         try:
             import chromadb
 
-            client = chromadb.PersistentClient(path=self.persist_directory)
+            chroma_host = os.getenv("CHROMA_SERVER_HOST", "").strip()
+            chroma_port = int(os.getenv("CHROMA_SERVER_HTTP_PORT", "8000"))
+            if chroma_host:
+                client = chromadb.HttpClient(host=chroma_host, port=chroma_port)
+            else:
+                client = chromadb.PersistentClient(path=self.persist_directory)
             self._collection = client.get_or_create_collection(
                 name=self.collection_name,
                 embedding_function=_HashEmbeddingFunction(),
             )
-            self.backend = "chromadb"
+            self.backend = "chromadb_http" if chroma_host else "chromadb"
         except Exception:
             self._collection = None
 

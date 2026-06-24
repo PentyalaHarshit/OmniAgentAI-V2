@@ -10,9 +10,7 @@ python-docx==1.1.2
 
 openai==1.59.7
 beautifulsoup4==4.12.3
-sentence-transformers==3.3.1
-qdrant-client==1.12.1
 chromadb==0.5.23
 wikipedia-api==0.7.1
 tqdm==4.67.1
-pyspark==3.5.3
+rapidfuzz==3.13.0

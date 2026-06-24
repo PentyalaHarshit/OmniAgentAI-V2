@@ -59,6 +59,22 @@ Open:
 http://127.0.0.1:8000
 ```
 
+## Docker Compose / AWS EC2
+
+OmniAgentAI can run on an Ubuntu EC2 instance with FastAPI, Ollama, and ChromaDB:
+
+```bash
+docker compose up --build -d
+```
+
+Open:
+
+```text
+http://YOUR_PUBLIC_IP:8000/docs
+```
+
+Full EC2 deployment steps are in [docs/aws_ec2_deployment.md](docs/aws_ec2_deployment.md).
+
 ## How to Use Upload
 
 1. Click 📎 Upload file.

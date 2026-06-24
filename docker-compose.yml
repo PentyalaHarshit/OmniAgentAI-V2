@@ -1,14 +1,47 @@
 services:
   omniagentai:
+    container_name: omniagentai
     build:
       context: .
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      CHROMA_SERVER_HOST: chromadb
+      CHROMA_SERVER_HTTP_PORT: "8000"
     env_file:
       - path: .env
         required: false
     volumes:
       - ./knowledge:/app/knowledge
       - ./uploads:/app/uploads
+    depends_on:
+      - ollama
+      - chromadb
     restart: unless-stopped
+
+  ollama:
+    container_name: ollama
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    expose:
+      - "11434"
+    restart: unless-stopped
+
+  chromadb:
+    container_name: chromadb
+    image: chromadb/chroma:0.5.23
+    volumes:
+      - chroma_data:/chroma/chroma
+    expose:
+      - "8000"
+    environment:
+      IS_PERSISTENT: "TRUE"
+      PERSIST_DIRECTORY: /chroma/chroma
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+  chroma_data:
