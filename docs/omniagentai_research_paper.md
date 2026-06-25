@@ -43,12 +43,13 @@ OmniAgentAI is organized around the following high-level pipeline:
 5. Specialized agent execution.
 6. Reasoning through Chain-of-Thought or Tree-of-Thought.
 7. Action through tools, MCP, Web RAG, fact RAG, normal RAG, APIs, or databases.
-8. Observation collection.
-9. ReAct cycles for multi-step tasks.
-10. CrewAI-style analysis and validation.
-11. Multi-LLM collaboration when useful.
-12. Verification and self-correction.
-13. Final response or retry/backtracking through router or agent node.
+8. Persistent storage through local storage, Amazon S3, or Azure Blob Storage.
+9. Observation collection.
+10. ReAct cycles for multi-step tasks.
+11. CrewAI-style analysis and validation.
+12. Multi-LLM collaboration when useful.
+13. Verification and self-correction.
+14. Final response or retry/backtracking through router or agent node.
 
 The system can be represented as:
 
@@ -59,6 +60,7 @@ User Query
 -> Domain Agent
 -> Reasoning Policy
 -> Action Layer
+-> Storage Layer
 -> Observation
 -> Crew Evaluation
 -> Multi-LLM Collaboration
@@ -144,6 +146,7 @@ After reasoning, agents perform actions. Actions are domain-specific and may inc
 - Normal RAG: retrieve from local documents or uploaded files.
 - MCP tools: call external APIs, browser tools, database tools, or service connectors.
 - Domain databases: healthcare doctor database, booking database, finance data, product catalog, movie data, or travel data.
+- Cloud object storage: persist uploaded files, generated artifacts, logs, embeddings metadata, and long-running workflow outputs in Amazon S3 or Azure Blob Storage.
 - Deterministic tools: calculator, compiler, validator, code runner, parser, or verifier.
 
 For the GeneralAgent, the preferred action path is:
@@ -320,6 +323,8 @@ User: "Give more details."
 The system resolves "more details" to the prior topic and generates an expanded response. Memory also supports personalization, task continuity, and long-running workflows.
 
 The upload layer supports PDFs, DOCX files, spreadsheets, and other documents. Uploaded documents can be chunked, embedded, indexed, and retrieved through normal RAG. This allows the system to answer questions using user-provided files rather than only web data or built-in facts.
+
+For production deployments, OmniAgentAI V2 can use a cloud object storage layer such as Amazon S3 or Azure Blob Storage. This layer stores original uploaded files, extracted text, generated reports, intermediate tool artifacts, cached RAG documents, and audit logs. The vector database stores embeddings and retrieval indexes, while S3 or Azure Blob stores the larger source objects and durable workflow artifacts. This separation keeps retrieval fast while allowing files and generated outputs to remain persistent, scalable, and portable across cloud environments.
 
 ## 15. Neuro-Symbolic Design
 

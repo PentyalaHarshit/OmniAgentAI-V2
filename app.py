@@ -1,9 +1,11 @@
 from fastapi import FastAPI, Request, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+from config import FRONTEND_ORIGINS
 from llm_tree.free_llm_tree import FreeLLMTree
 from agents.agent_router import AgentRouter
 from agents.web_agent import WebAgent
@@ -12,6 +14,14 @@ from tools.conversation_state import ConversationState
 from tools.chat_memory import ChatMemory
 
 app = FastAPI(title="OmniAgentAI v2 ChatGPT Style Upload Chat")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=FRONTEND_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")

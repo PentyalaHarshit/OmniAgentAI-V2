@@ -33,9 +33,30 @@ Example `.env`:
 HOTEL_PROVIDER=serpapi
 SERPAPI_API_KEY=your_serpapi_key
 NEWSAPI_KEY=optional_future_newsapi_key
+
+# Upload/object storage
+STORAGE_PROVIDER=local
+STORAGE_LOCAL_DIR=uploads
+
+# Amazon S3, when STORAGE_PROVIDER=s3
+S3_BUCKET=your_bucket
+S3_PREFIX=omniagentai/uploads
+AWS_REGION=us-east-1
+
+# Azure Blob Storage, when STORAGE_PROVIDER=azure_blob
+AZURE_STORAGE_CONNECTION_STRING=your_connection_string
+AZURE_STORAGE_CONTAINER=your_container
+AZURE_STORAGE_PREFIX=omniagentai/uploads
 ```
 
 Never commit `.env`.
+
+For cloud object storage, install the matching optional SDK:
+
+```bash
+pip install boto3
+pip install azure-storage-blob
+```
 
 Safety remains unchanged: real APIs can retrieve options and live data, but OmniAgentAI must not buy, pay, book, cancel, or diagnose without explicit user confirmation.
 
@@ -59,6 +80,25 @@ Open:
 http://127.0.0.1:8000
 ```
 
+## React / Next.js Frontend
+
+The repo also includes a Next.js frontend in `frontend/`. Run the FastAPI backend on port `8000`, then start the React app:
+
+```bash
+cd frontend
+copy .env.example .env.local
+npm install
+npm run dev
+```
+
+Open:
+
+```text
+http://127.0.0.1:3000
+```
+
+The frontend calls the backend using `NEXT_PUBLIC_API_BASE_URL`, which defaults to `http://127.0.0.1:8000`.
+
 ## Docker Compose / AWS EC2
 
 OmniAgentAI can run on an Ubuntu EC2 instance with FastAPI, Ollama, and ChromaDB:
@@ -81,6 +121,8 @@ Full EC2 deployment steps are in [docs/aws_ec2_deployment.md](docs/aws_ec2_deplo
 2. Select TXT, PDF, or DOCX.
 3. The file appears in dropdown.
 4. Ask: `summarize this file`, `improve my resume`, or `find research gaps`.
+
+Uploads are stored through the configured storage backend. Local mode writes to `uploads/`; S3 and Azure Blob mode store the durable object in cloud storage while keeping a local cache for text extraction and RAG context.
 
 ## Natural Conversation Examples
 

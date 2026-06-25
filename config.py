@@ -4,6 +4,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 APP_NAME = "OmniAgentAI v9 All Agents RAG Healthcare"
+FRONTEND_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "FRONTEND_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000",
+    ).split(",")
+    if origin.strip()
+]
 
 USE_OLLAMA = os.getenv("USE_OLLAMA", "true").lower() == "true"
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -18,6 +26,17 @@ CPP_COMPILER = os.getenv("CPP_COMPILER", "g++")
 PYTHON_BIN = os.getenv("PYTHON_BIN", "python")
 MAX_SELF_CORRECT_ROUNDS = int(os.getenv("MAX_SELF_CORRECT_ROUNDS", "2"))
 KNOWLEDGE_DIR = "knowledge"
+
+# Object storage for uploaded files and generated artifacts.
+# local = workspace filesystem, s3 = Amazon S3, azure_blob = Azure Blob Storage
+STORAGE_PROVIDER = os.getenv("STORAGE_PROVIDER", "local").lower()
+STORAGE_LOCAL_DIR = os.getenv("STORAGE_LOCAL_DIR", "uploads")
+S3_BUCKET = os.getenv("S3_BUCKET", "")
+S3_PREFIX = os.getenv("S3_PREFIX", "omniagentai/uploads")
+AWS_REGION = os.getenv("AWS_REGION", "")
+AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING", "")
+AZURE_STORAGE_CONTAINER = os.getenv("AZURE_STORAGE_CONTAINER", "")
+AZURE_STORAGE_PREFIX = os.getenv("AZURE_STORAGE_PREFIX", "omniagentai/uploads")
 
 # Real/live API providers
 HOTEL_PROVIDER = os.getenv("HOTEL_PROVIDER", "demo").lower()

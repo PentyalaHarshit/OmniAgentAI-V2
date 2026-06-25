@@ -4,6 +4,8 @@ import uuid
 from pathlib import Path
 from fastapi import UploadFile
 
+from tools.object_storage import ObjectStorage, build_object_storage
+
 try:
     from pypdf import PdfReader
 except Exception:
@@ -16,10 +18,11 @@ except Exception:
 
 
 class UploadManager:
-    def __init__(self, upload_dir: str = "uploads"):
+    def __init__(self, upload_dir: str = "uploads", storage: ObjectStorage | None = None):
         self.upload_dir = Path(upload_dir)
         self.upload_dir.mkdir(parents=True, exist_ok=True)
         self.index_file = self.upload_dir / "index.json"
+        self.storage = storage or build_object_storage()
 
         if not self.index_file.exists():
             self.index_file.write_text("{}", encoding="utf-8")
@@ -41,7 +44,12 @@ class UploadManager:
 
         path = self.upload_dir / stored
         content = await file.read()
-        path.write_bytes(content)
+        content_type = file.content_type or "application/octet-stream"
+        stored_object = self.storage.put_bytes(stored, content, content_type=content_type)
+
+        # Keep a local cache so text extraction works even when durable storage is S3/Azure Blob.
+        if not path.exists():
+            path.write_bytes(content)
 
         text = self.extract_text(path)
 
@@ -51,6 +59,10 @@ class UploadManager:
             "filename": safe_name,
             "stored_name": stored,
             "path": str(path),
+            "storage_provider": stored_object.provider,
+            "storage_bucket": stored_object.bucket,
+            "storage_key": stored_object.key,
+            "storage_uri": stored_object.uri,
             "size_bytes": len(content),
             "text_chars": len(text),
             "text": text[:200000]
@@ -60,6 +72,8 @@ class UploadManager:
         return {
             "file_id": file_id,
             "filename": safe_name,
+            "storage_provider": stored_object.provider,
+            "storage_uri": stored_object.uri,
             "size_bytes": len(content),
             "text_chars": len(text),
             "message": "File uploaded and indexed successfully"
@@ -99,6 +113,8 @@ class UploadManager:
             files.append({
                 "file_id": v["file_id"],
                 "filename": v["filename"],
+                "storage_provider": v.get("storage_provider", "local"),
+                "storage_uri": v.get("storage_uri", v.get("path", "")),
                 "size_bytes": v["size_bytes"],
                 "text_chars": v["text_chars"],
                 "exists": file_exists
